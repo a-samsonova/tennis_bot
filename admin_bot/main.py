@@ -9,7 +9,7 @@ import django
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'tennis_bot.settings')
 django.setup()
 
-from tennis_bot.settings import ADMIN_TELEGRAM_TOKEN
+from tennis_bot.config import ADMIN_TELEGRAM_TOKEN
 from admin_bot.handlers import (
     start,
     permission_for_ind_train

@@ -9,7 +9,8 @@ from telegram import (ReplyKeyboardMarkup,
 from tele_interface.manage_data import (
     SELECT_GROUP_LESSON_TIME,
     SELECT_IND_LESSON_TIME,
-    SELECT_TRAINING_TYPE,)
+    SELECT_TRAINING_TYPE,
+    SELECT_SKIP_TIME_BUTTON,)
 
 DTTM_BOT_FORMAT = '%Y.%m.%d.%H.%M'
 DT_BOT_FORMAT = '%Y.%m.%d'
@@ -89,11 +90,11 @@ def construct_dt_menu(button_text, dates, date=None):
         ])
     back_data = SELECT_TRAINING_TYPE + 'ind' if re.findall(r'^{}'.format(SELECT_IND_LESSON_TIME),
                                                            button_info) else 'Записаться на занятие'
-
-    buttons.append([
-        inlinebutt('⬅️ назад',
-                   callback_data=back_data),
-    ])
+    if not re.findall(r'^{}'.format(SELECT_SKIP_TIME_BUTTON), button_info):
+        buttons.append([
+            inlinebutt('⬅️ назад',
+                       callback_data=back_data),
+        ])
     return inlinemark(buttons)
 
 
