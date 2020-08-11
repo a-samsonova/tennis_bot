@@ -1,0 +1,3 @@
+.idea*
+db.sqlite3
+tennis_bot/config.py
