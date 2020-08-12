@@ -1,9 +1,4 @@
-import datetime
-from telegram import (
-    InlineKeyboardButton as inlinebutt,
-    InlineKeyboardMarkup as inlinemark,
-)
-from base.models import User, Channel
+from base.models import User
 from functools import wraps
 import telegram
 import sys
@@ -58,12 +53,3 @@ def admin_handler_decor():
             return
         return wrapper
     return decor
-
-#
-# def construct_menu_for_user_set_up(user):
-#     """
-#
-#     Делает кнопки для настроек параметров нового пользователя.
-#     :return:
-#     """
-#     markup = inlinemark([inlinebutt('Время до отмены', callback_data=)])

@@ -6,7 +6,7 @@ from telegram.ext import (
 )
 import django
 
-import os, sys
+import os
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'tennis_bot.settings')
 django.setup()
 
@@ -24,7 +24,6 @@ from tele_interface.handlers import (
     choose_dt_time_for_ind_train,
     select_precise_ind_lesson_time,
 )
-from base.models import Channel
 from tele_interface.manage_data import (
     SELECT_SKIP_TIME_BUTTON,
     SELECT_GROUP_LESSON_TIME,
@@ -34,13 +33,13 @@ from tele_interface.manage_data import (
     SELECT_IND_LESSON_TIME,
     SELECT_PRECISE_IND_TIME,
 )
+from tennis_bot.config import TELEGRAM_TOKEN
 
 
-def add_handlers(updater, channel):
+def add_handlers(updater):
     dp = updater.dispatcher
 
     dp.add_handler(CommandHandler("start", start))
-    #   dp.add_handler(CommandHandler("help", help))
 
     dp.add_handler(RegexHandler('Пропустить занятие', skip_lesson))
     dp.add_handler(RegexHandler('Записаться на занятие', choose_type_of_training))
@@ -60,10 +59,8 @@ def add_handlers(updater, channel):
 
 
 def main():
-    bot_code = sys.argv[1]
-    telebot_instance = Channel.objects.get(code=bot_code)
-    updater = Updater(telebot_instance.token, workers=8)
-    add_handlers(updater, telebot_instance)
+    updater = Updater(TELEGRAM_TOKEN, workers=8)
+    add_handlers(updater)
     updater.start_polling()
     updater.idle()
 

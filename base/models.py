@@ -7,6 +7,7 @@ from datetime import timedelta, datetime
 from base.utils import construct_main_menu
 from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
+from tennis_bot.config import TELEGRAM_TOKEN
 
 import telegram
 
@@ -24,6 +25,7 @@ class User(AbstractUser):
     STATUS_TRAINING = 'G'
     STATUS_FINISHED = 'F'
     STATUS_ARBITRARY = 'A'
+    STATUS_IND_TRAIN = 'I'
     STATUSES = (
         (STATUS_WAITING, 'в ожидании'),
         (STATUS_TRAINING, 'групповые тренировки'),
@@ -34,7 +36,7 @@ class User(AbstractUser):
     tarif_for_status = {
         STATUS_TRAINING: 400,
         STATUS_ARBITRARY: 600,
-        'инд': 1400,
+        STATUS_IND_TRAIN: 1400,
     }
 
     id = models.BigIntegerField(primary_key=True)  # telegram id
@@ -70,37 +72,23 @@ class UserForm(forms.ModelForm):
         if 'status' in self.changed_data:
             new_status = self.cleaned_data.get('status')
             if self.instance.status == User.STATUS_WAITING and (new_status == User.STATUS_ARBITRARY or new_status == User.STATUS_TRAINING):
-                channel = Channel.objects.first()
-                bot = telegram.Bot(channel.token)
+                bot = telegram.Bot(TELEGRAM_TOKEN)
                 bot.send_message(self.instance.id,
                                  'Теперь тебе доступен мой функционал, поздравляю!',
                                  reply_markup=construct_main_menu())
-
-
-class Tarif(models.Model):
-    name = models.CharField(max_length=64, blank=True, null=True)
-    price_per_hour = models.IntegerField(verbose_name='Цена за час')
-
-    class Meta:
-        verbose_name = 'тариф'
-        verbose_name_plural = 'тарифы'
-
-    def __str__(self):
-        return '{} -- {} руб./час'.format(self.name, self.price_per_hour)
 
 
 class TrainingGroup(ModelwithTime):
     name = models.CharField(max_length=32, verbose_name='имя')
     users = models.ManyToManyField(User)
     max_players = models.SmallIntegerField(default=6, verbose_name='Максимальное количество игроков в группе')
-    tarif = models.ForeignKey(Tarif, null=True, on_delete=models.SET_NULL, verbose_name='тариф')
 
     class Meta:
         verbose_name = 'банда'
         verbose_name_plural = 'банды'
 
     def __str__(self):
-        return '{}, {}'.format(self.name, self.tarif)
+        return '{}, max_players: {}'.format(self.name, self.max_players)
 
 
 class TrainingGroupForm(forms.ModelForm):
@@ -168,8 +156,7 @@ class GroupTrainingDayForm(forms.ModelForm):
             # если тренировка была доступна, а потом перестала быть таковой:
             group_members = self.instance.group.users.all()
             visitors = self.instance.visitors.all()
-            channel = Channel.objects.first()
-            bot = telegram.Bot(channel.token)
+            bot = telegram.Bot(TELEGRAM_TOKEN)
             # todo: сделать нормальную отправку сообщений (как в Post Market)
             for player in group_members.union(visitors):
                 try:
@@ -180,6 +167,7 @@ class GroupTrainingDayForm(forms.ModelForm):
                                      parse_mode='HTML')
                 except (telegram.error.Unauthorized, telegram.error.BadRequest):
                     player.is_blocked = True
+                    player.status = User.STATUS_FINISHED
                     player.save()
 
 
@@ -229,9 +217,7 @@ def create_group_for_arbitrary(sender, instance, **kwargs):
         для него группу, состояющую только из него.
     """
     if instance.status == User.STATUS_ARBITRARY:
-        tarif = Tarif.objects.get(name='Freelancer')# todo: сделать че-то с этим -- очень херово
-        group = TrainingGroup(name=instance.first_name + instance.last_name, tarif=tarif, max_players=1)
-        group.save()
+        group = TrainingGroup(name=instance.first_name + instance.last_name, max_players=1)
         group.users.add(instance)
 
 

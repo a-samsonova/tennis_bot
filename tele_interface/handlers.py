@@ -1,5 +1,6 @@
 from .utils import (handler_decor,
-                    get_available_dt_time4ind_train,)
+                    get_available_dt_time4ind_train, select_tr_days_for_skipping,
+                    get_potential_days_for_group_training, )
 from base.utils import (construct_main_menu,
                         construct_dt_menu,
                         construct_time_menu_for_group_lesson,
@@ -115,13 +116,13 @@ def user_main_info(bot, update, user):
     number_of_days_in_next_month = monthrange(next_month.year, next_month.month)[1]
     last_day_in_next_month = date(next_month.year, next_month.month, number_of_days_in_next_month)
 
-    should_pay = GroupTrainingDay.objects.filter(group__users__in=[user],
-                                                 date__gte=next_month,
-                                                 date__lte=last_day_in_next_month).annotate(
-        lesson_tarif=F('group__tarif__price_per_hour')).aggregate(sigma=Sum('lesson_tarif'))
-    should_pay_money = should_pay['sigma'] if should_pay['sigma'] else 0
-    should_pay_info = 'В следующем месяце <b>нужно заплатить {} ₽</b>.'.format(should_pay_money)
-    # todo: сделать нормальный подсчет оплаты
+    # should_pay = GroupTrainingDay.objects.filter(group__users__in=[user],
+    #                                              date__gte=next_month,
+    #                                              date__lte=last_day_in_next_month).annotate(
+    #     lesson_tarif=F('group__tarif__price_per_hour')).aggregate(sigma=Sum('lesson_tarif'))
+    # should_pay_money = should_pay['sigma'] if should_pay['sigma'] else 0
+    # should_pay_info = 'В следующем месяце <b>нужно заплатить {} ₽</b>.'.format(should_pay_money)
+    # todo: сделать нормальный подсчет оплаты -- уточнить У Влада, как это считается для каждого статуса
     text = intro + group_info + number_of_add_games
 
     bot.send_message(user.id,
@@ -132,14 +133,7 @@ def user_main_info(bot, update, user):
 
 @handler_decor(check_status=True)
 def skip_lesson(bot, update, user):
-
-    tmp = GroupTrainingDay.objects.filter(Q(group__users__in=[user]) | Q(visitors__in=[user]),
-                                          date__gt=date.today()).exclude(absent__in=[user]).order_by('id').distinct(
-        'id').values('date', 'start_time')
-    available_grouptraining_dates = [x['date'] for x in tmp  # учитываем время до отмены
-                                     if datetime.combine(x['date'],
-                                                         x['start_time']) - datetime.now() >
-                                     user.time_before_cancel]
+    available_grouptraining_dates = select_tr_days_for_skipping(user)
     if available_grouptraining_dates:
         buttons = construct_dt_menu(SELECT_SKIP_TIME_BUTTON + '*' + str(date.today().month),
                                     available_grouptraining_dates)
@@ -149,6 +143,31 @@ def skip_lesson(bot, update, user):
     else:
         bot.send_message(user.id,
                          'Пока что нечего пропускать.')
+
+
+@handler_decor()
+def choose_dt_for_cancel(bot, update, user):
+    date_btn, date_type = update.callback_query.data[len(SELECT_SKIP_TIME_BUTTON):].split('|')
+    date_dt = datetime.strptime(date_btn, DT_BOT_FORMAT)
+    if date_type == 'day':
+        training_day = GroupTrainingDay.objects.filter(Q(group__users__in=[user]) | Q(visitors__in=[user]),
+                                                       date=date_dt).order_by('id').distinct('id').first()
+        if user in training_day.visitors.all():  # проверяем его ли эта группа или он удаляется из занятия другой группы
+            training_day.visitors.remove(user)
+        else:
+            training_day.absent.add(user)
+        bot.edit_message_text('Окей, занятие {} отменено'.format(date_btn),
+                              chat_id=update.callback_query.message.chat_id,
+                              message_id=update.callback_query.message.message_id)
+        user.bonus_lesson += 1
+        user.save()
+    else:
+        available_grouptraining_dates = select_tr_days_for_skipping(user)
+        buttons = construct_dt_menu(SELECT_SKIP_TIME_BUTTON + '*' + str(date_dt.month),
+                                    available_grouptraining_dates, date=date_dt)
+        bot.edit_message_reply_markup(chat_id=update.callback_query.message.chat_id,
+                                      message_id=update.callback_query.message.message_id,
+                                      reply_markup=buttons)
 
 
 @handler_decor(check_status=True)
@@ -178,14 +197,7 @@ def take_lesson(bot, update, user):
     tr_type = update.callback_query.data[len(SELECT_TRAINING_TYPE):]
     if tr_type == 'group':
 
-        potential_free_places = GroupTrainingDay.objects.annotate(
-            n_absent=Count('absent'),
-            max_players=F('group__max_players'),
-            n_players=Count('group__users'),
-            n_visitors=Count('visitors')).filter(
-            max_players__gt=F('n_visitors') + F('n_players') - F('n_absent')).exclude(
-            Q(visitors__in=[user]) | Q(group__users__in=[user])).order_by(
-            'start_time')
+        potential_free_places = get_potential_days_for_group_training(user)
         potential_free_places = potential_free_places.filter(date__gt=datetime.now())
         days_with_free_places = list(set([x.date for x in potential_free_places]))
         buttons = construct_dt_menu(SELECT_GROUP_LESSON_TIME + '*' + str(date.today().month),
@@ -275,36 +287,43 @@ def choose_dt_time_for_ind_train(bot, update, user):
 
 
 @handler_decor()
-def choose_dt_for_cancel(bot, update, user):
-    date_btn, date_type = update.callback_query.data[len(SELECT_SKIP_TIME_BUTTON):].split('|')
-    date_dt = datetime.strptime(date_btn, DT_BOT_FORMAT)
-    if date_type == 'day':
-        training_day = GroupTrainingDay.objects.filter(Q(group__users__in=[user]) | Q(visitors__in=[user]),
-                                                       date=date_dt).order_by('id').distinct('id').first()
-        if user in training_day.visitors.all():  # проверяем его ли эта группа или он удаляется из занятия другой группы
-            training_day.visitors.remove(user)
-        else:
-            training_day.absent.add(user)
-        bot.edit_message_text('Окей, занятие {} отменено'.format(date_btn),
-                              chat_id=update.callback_query.message.chat_id,
-                              message_id=update.callback_query.message.message_id)
-        user.bonus_lesson += 1
-        user.save()
-    else:
-        tmp = GroupTrainingDay.objects.filter(Q(group__users__in=[user]) | Q(visitors__in=[user]),
-                                              date__gte=date.today()).exclude(
-            absent__in=[user]
-        ).order_by('id').distinct('id').values(
-            'date', 'start_time')
-        available_grouptraining_dates = [x['date'] for x in tmp
-                                         if datetime.combine(x['date'],
-                                                             x['start_time']) - datetime.now() >
-                                         user.time_before_cancel]
-        buttons = construct_dt_menu(SELECT_SKIP_TIME_BUTTON + '*' + str(date_dt.month),
-                                    available_grouptraining_dates, date=date_dt)
-        bot.edit_message_reply_markup(chat_id=update.callback_query.message.chat_id,
-                                      message_id=update.callback_query.message.message_id,
-                                      reply_markup=buttons)
+def select_precise_ind_lesson_time(bot, update, user):
+    day_dt, start_time, end_time = update.callback_query.data[len(SELECT_PRECISE_IND_TIME):].split('|')
+    date_dt = datetime.strptime(day_dt, DT_BOT_FORMAT)
+    st_time_obj = datetime.strptime(start_time, '%H:%M:%S')
+    end_time_obj = datetime.strptime(end_time, '%H:%M:%S')
+    duration = end_time_obj - st_time_obj
+
+    day_of_week = from_eng_to_rus_day_week[calendar.day_name[date_dt.date().weekday()]]
+
+    group, _ = TrainingGroup.objects.get_or_create(name=user.first_name+user.last_name,
+                                                   max_players=1)
+
+    tr_day = GroupTrainingDay.objects.create(group=group, date=date_dt, start_time=st_time_obj, duration=duration)
+
+    bot.edit_message_text(f"Сообщу тренеру, что ты хочешь прийти на индивидуальное занятие"
+                          f" <b>{day_dt} ({day_of_week}) </b>\n"
+                          f"Время: <b>{start_time} — {end_time}</b>",
+                          chat_id=update.callback_query.message.chat_id,
+                          message_id=update.callback_query.message.message_id,
+                          parse_mode='HTML')
+
+    admin_bot = telegram.Bot(ADMIN_TELEGRAM_TOKEN)
+    admins = User.objects.filter(is_staff=True, is_blocked=False)
+    buttons = [[
+        inline_button('Да', callback_data=f"{PERMISSION_FOR_IND_TRAIN}yes|{user.id}|{tr_day.id}")
+    ], [
+        inline_button('Нет', callback_data=f"{PERMISSION_FOR_IND_TRAIN}no|{user.id}|{tr_day.id}")
+    ]]
+    text = f"<b>{user.first_name} {user.last_name} — {user.phone_number}</b>\n" \
+           f"Хочет прийти на индивидуальное занятие <b>{day_dt} ({day_of_week}) </b>" \
+           f" в <b>{start_time} — {end_time}</b>\n" \
+           f"<b>Разрешить?</b>"
+    for admin in admins:
+        admin_bot.send_message(admin.id,
+                               text,
+                               parse_mode='HTML',
+                               reply_markup=inline_markup(buttons))
 
 
 @handler_decor()
@@ -312,17 +331,9 @@ def choose_dt_for_group_lesson(bot, update, user):
     date_btn, date_type = update.callback_query.data[len(SELECT_GROUP_LESSON_TIME):].split('|')
     date_dt = datetime.strptime(date_btn, DT_BOT_FORMAT)
 
-    potential_free_places = GroupTrainingDay.objects.annotate(
-        n_absent=Count('absent'),
-        max_players=F('group__max_players'),
-        n_players=Count('group__users'),
-        n_visitors=Count('visitors')).filter(
-        max_players__gt=F('n_visitors') + F('n_players') - F('n_absent')).exclude(
-        Q(visitors__in=[user]) | Q(group__users__in=[user])).order_by(
-        'start_time')
+    potential_free_places = get_potential_days_for_group_training(user)
 
     if date_type == 'day':
-        # todo: уменьшать кол-во отыгрешей, если у него есть, иначе добавлять № рублей к стоимости и писать об этом
 
         training_days = potential_free_places.filter(date=date_dt)
         buttons = construct_time_menu_for_group_lesson(SELECT_PRECISE_GROUP_TIME, training_days)
@@ -369,41 +380,4 @@ def select_precise_group_lesson_time(bot, update, user):
         user.save()
 
 
-@handler_decor()
-def select_precise_ind_lesson_time(bot, update, user):
-    day_dt, start_time, end_time = update.callback_query.data[len(SELECT_PRECISE_IND_TIME):].split('|')
-    date_dt = datetime.strptime(day_dt, DT_BOT_FORMAT)
-    st_time_obj = datetime.strptime(start_time, '%H:%M:%S')
-    end_time_obj = datetime.strptime(end_time, '%H:%M:%S')
-    duration = end_time_obj - st_time_obj
 
-    day_of_week = from_eng_to_rus_day_week[calendar.day_name[date_dt.date().weekday()]]
-
-    group, _ = TrainingGroup.objects.get_or_create(name=user.first_name+user.last_name,
-                                                   max_players=1)
-
-    tr_day = GroupTrainingDay.objects.create(group=group, date=date_dt, start_time=st_time_obj, duration=duration)
-
-    bot.edit_message_text(f"Сообщу тренеру, что ты хочешь прийти на индивидуальное занятие"
-                          f" <b>{day_dt} ({day_of_week}) </b>\n"
-                          f"Время: <b>{start_time} — {end_time}</b>",
-                          chat_id=update.callback_query.message.chat_id,
-                          message_id=update.callback_query.message.message_id,
-                          parse_mode='HTML')
-
-    admin_bot = telegram.Bot(ADMIN_TELEGRAM_TOKEN)
-    admins = User.objects.filter(is_staff=True, is_blocked=False)
-    buttons = [[
-        inline_button('Да', callback_data=f"{PERMISSION_FOR_IND_TRAIN}yes|{user.id}|{tr_day.id}")
-    ], [
-        inline_button('Нет', callback_data=f"{PERMISSION_FOR_IND_TRAIN}no|{user.id}|{tr_day.id}")
-    ]]
-    text = f"<b>{user.first_name} {user.last_name} — {user.phone_number}</b>\n" \
-           f"Хочет прийти на индивидуальное занятие <b>{day_dt} ({day_of_week}) </b>" \
-           f" в <b>{start_time} — {end_time}</b>\n" \
-           f"<b>Разрешить?</b>"
-    for admin in admins:
-        admin_bot.send_message(admin.id,
-                               text,
-                               parse_mode='HTML',
-                               reply_markup=inline_markup(buttons))

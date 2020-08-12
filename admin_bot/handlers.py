@@ -1,11 +1,11 @@
-import datetime
-
-import telegram
-
-from base.models import Channel, User, GroupTrainingDay
+from base.models import User, GroupTrainingDay
 from base.utils import DT_BOT_FORMAT, TM_TIME_SCHEDULE_FORMAT
 from tele_interface.manage_data import PERMISSION_FOR_IND_TRAIN
 from .utils import admin_handler_decor
+from tennis_bot.config import TELEGRAM_TOKEN
+
+import datetime
+import telegram
 
 
 @admin_handler_decor()
@@ -20,8 +20,7 @@ def start(bot, update, user):
 def permission_for_ind_train(bot, update, user):
     permission, user_id, tr_day_id = update.callback_query.data[len(PERMISSION_FOR_IND_TRAIN):].split('|')
 
-    bot_token = Channel.objects.get(code='tennis').token
-    tennis_bot = telegram.Bot(bot_token)
+    tennis_bot = telegram.Bot(TELEGRAM_TOKEN)
 
     player = User.objects.get(id=user_id)
     tr_day = GroupTrainingDay.objects.get(id=tr_day_id)

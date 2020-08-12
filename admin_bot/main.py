@@ -26,8 +26,6 @@ def add_handlers(updater):
 
 
 def main():
-    # bot_code = sys.argv[1]
-    # telebot_instance = Channel.objects.get(code=bot_code)
     updater = Updater(ADMIN_TELEGRAM_TOKEN)
     add_handlers(updater)
     updater.start_polling()
