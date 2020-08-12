@@ -127,3 +127,9 @@ STATIC_URL = '/static/'
 
 
 AUTH_USER_MODEL = 'base.User'
+
+if os.path.isfile(os.path.join(BASE_DIR, "tennis_bot", "config.py")):
+    from .config import *
+
+if DEBUG is True:
+   MIDDLEWARE += ['debug_toolbar.middleware.DebugToolbarMiddleware']
