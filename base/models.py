@@ -94,7 +94,7 @@ class TrainingGroup(ModelwithTime):
 class TrainingGroupForm(forms.ModelForm):
     class Meta:
         model = TrainingGroup
-        fields = ['name', 'users', 'max_players', 'tarif']
+        fields = ['name', 'users', 'max_players']
 
     def clean(self):
         users = self.cleaned_data.get('users')
@@ -188,16 +188,15 @@ def create_training_days_for_next_two_months(sender, instance, created, **kwargs
     еще таких же записей примерно на 2 месяца вперед.
     Используем bulk_create, т.к. иначе получим рекурсию.
     """
-    if created and instance.group.tarif:
-        if instance.group.tarif.name == 'Group':
-            date = instance.date + timedelta(days=7)
-            dates = [date]
-            for _ in range(7):
-                date += timedelta(days=7)
-                dates.append(date)
-            objs = [GroupTrainingDay(group=instance.group, date=dat, start_time=instance.start_time,
-                                     duration=instance.duration) for dat in dates]
-            GroupTrainingDay.objects.bulk_create(objs)
+    if created and instance.group.max_players > 1:
+        date = instance.date + timedelta(days=7)
+        dates = [date]
+        for _ in range(24):
+            date += timedelta(days=7)
+            dates.append(date)
+        objs = [GroupTrainingDay(group=instance.group, date=dat, start_time=instance.start_time,
+                                 duration=instance.duration) for dat in dates]
+        GroupTrainingDay.objects.bulk_create(objs)
 
 
 @receiver(post_delete, sender=GroupTrainingDay)

@@ -1,5 +1,4 @@
 from django.contrib import admin
-from functools import partial
 # Register your models here.
 from .models import *
 
@@ -12,15 +11,10 @@ class UserAdmin(admin.ModelAdmin):
     list_filter = ('status',)
 
 
-@admin.register(Tarif)
-class TarifAdmin(admin.ModelAdmin):
-    list_display = ('name', 'price_per_hour',)
-
-
 @admin.register(TrainingGroup)
 class TrainingGroupAdmin(admin.ModelAdmin):
     form = TrainingGroupForm
-    list_display = ('name', 'tarif')
+    list_display = ('name', 'max_players')
     raw_id_fields = ('users',)
 
 
