@@ -210,12 +210,12 @@ def delete_training_days(sender, instance, **kwargs):
 
 
 @receiver(post_save, sender=User)
-def create_group_for_arbitrary(sender, instance, **kwargs):
+def create_group_for_arbitrary(sender, instance, created, **kwargs):
     """
         Если игрок ходит по свободному графику, то создадим
         для него группу, состояющую только из него.
     """
-    if instance.status == User.STATUS_ARBITRARY:
+    if created and instance.status == User.STATUS_ARBITRARY:
         group = TrainingGroup(name=instance.first_name + instance.last_name, max_players=1)
         group.users.add(instance)
 
