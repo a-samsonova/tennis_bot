@@ -319,11 +319,17 @@ def select_precise_ind_lesson_time(bot, update, user):
            f"Хочет прийти на индивидуальное занятие <b>{day_dt} ({day_of_week}) </b>" \
            f" в <b>{start_time} — {end_time}</b>\n" \
            f"<b>Разрешить?</b>"
+    # todo: сделать нормальную отправку сообщений (как в Post Market)
     for admin in admins:
-        admin_bot.send_message(admin.id,
-                               text,
-                               parse_mode='HTML',
-                               reply_markup=inline_markup(buttons))
+        try:
+            admin_bot.send_message(admin.id,
+                                   text,
+                                   parse_mode='HTML',
+                                   reply_markup=inline_markup(buttons))
+        except (telegram.error.Unauthorized, telegram.error.BadRequest):
+            admin.is_blocked = True
+            admin.status = User.STATUS_FINISHED
+            admin.save()
 
 
 @handler_decor()
