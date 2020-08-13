@@ -58,7 +58,7 @@ def get_personal_data(bot, update, user):
             user.phone_number = int(phone_number_candidate[0])
             user.save()
             bot.send_message(user.id,
-                             'Как только тренер подтведит твою кандидатуру, я напишу.',
+                             'Как только тренер подтвердит твою кандидатуру, я напишу.',
                              reply_markup=construct_main_menu())
             admin_bot = telegram.Bot(ADMIN_TELEGRAM_TOKEN)
             admins = User.objects.filter(is_staff=True)
@@ -66,7 +66,7 @@ def get_personal_data(bot, update, user):
             for admin in admins:
                 admin_bot.send_message(admin.username,
                                        # todo: сделать вместо ссылки кнопки при отправке этого сообешния
-                                       'Пришел новый клиент:\n<b>{}</b>\n<a href="http://127.0.0.1:8000/admin/base/user/{}/change/">Настроить данные </a>'.format(
+                                       'Пришел новый клиент:\n<b>{}</b>\n<a href="http://188.120.225.57/admin/base/user/{}/change/">Настроить данные </a>'.format(
                                            user, user.id),
                                        parse_mode='HTML')
 
