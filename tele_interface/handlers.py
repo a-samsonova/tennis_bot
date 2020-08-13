@@ -71,7 +71,7 @@ def get_personal_data(bot, update, user):
                                        parse_mode='HTML')
 
     else:
-        if user.last_name and user.first_name:
+        if user.last_name and user.first_name and user.phone_number:
             bot.send_message(user.id, 'Контактные данные уже есть.')
         else:
             last_name, first_name = text.split(' ')
