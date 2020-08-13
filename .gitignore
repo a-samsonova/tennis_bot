@@ -3,3 +3,4 @@ db.sqlite3
 tennis_bot/config.py
 *.pyc
 tennis_bot/gunicorn_config.py
+/bin
