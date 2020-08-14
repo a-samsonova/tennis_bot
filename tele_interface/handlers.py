@@ -66,7 +66,7 @@ def get_personal_data(bot, update, user):
             for admin in admins:
                 admin_bot.send_message(admin.username,
                                        # todo: сделать вместо ссылки кнопки при отправке этого сообешния
-                                       'Пришел новый клиент:\n<b>{}</b>\n<a href="http://188.120.225.57/admin/base/user/{}/change/">Настроить данные </a>'.format(
+                                       'Пришел новый клиент:\n<b>{}</b>\n<a href="http://vladlen82.fvds.ru/admin/base/user/{}/change/">Настроить данные </a>'.format(
                                            user, user.id),
                                        parse_mode='HTML')
 
