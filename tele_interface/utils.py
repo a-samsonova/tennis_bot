@@ -120,7 +120,8 @@ def get_available_dt_time4ind_train(duration: float):
             times_to_remove.append(start)
         del times_to_remove[-1]
         for x in times_to_remove:
-            poss_date_time_dict[day['date_tmp']].remove(x)
+            if x in poss_date_time_dict[day['date_tmp']]:
+                poss_date_time_dict[day['date_tmp']].remove(x)
 
     poss_date_for_train = []
     for poss_date in poss_date_time_dict:
