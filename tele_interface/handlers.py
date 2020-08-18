@@ -4,7 +4,8 @@ from .utils import (handler_decor,
 from base.utils import (construct_main_menu,
                         construct_dt_menu,
                         construct_time_menu_for_group_lesson,
-                        construct_time_menu_4ind_lesson,)
+                        construct_time_menu_4ind_lesson,
+                        from_digit_to_month,)
 from base.models import (User,
                          GroupTrainingDay,
                          TrainingGroup,)
@@ -14,12 +15,15 @@ from .manage_data import (
     SELECT_PRECISE_GROUP_TIME,
     from_eng_to_rus_day_week,
     SELECT_TRAINING_TYPE,
-    SELECT_DURATION_FOR_IND_TRAIN, SELECT_IND_LESSON_TIME, SELECT_PRECISE_IND_TIME, PERMISSION_FOR_IND_TRAIN,
+    SELECT_DURATION_FOR_IND_TRAIN,
+    SELECT_IND_LESSON_TIME,
+    SELECT_PRECISE_IND_TIME,
+    PERMISSION_FOR_IND_TRAIN,
 )
 from calendar import monthrange
 from tennis_bot.config import ADMIN_TELEGRAM_TOKEN
 from datetime import date, datetime, timedelta
-from django.db.models import Count, Sum, Q, F
+from django.db.models import Q
 from base.utils import DT_BOT_FORMAT, TM_TIME_SCHEDULE_FORMAT
 
 from telegram import (
@@ -83,7 +87,6 @@ def get_personal_data(bot, update, user):
 
 @handler_decor(check_status=True)
 def user_main_info(bot, update, user):
-    # todo: переделать подсчет суммы -- учитывать статус игрока,  visitor или нет, колво отыгрышей
     """посмотреть, основную инфу:
         статус
         группа, если есть
@@ -108,6 +111,7 @@ def user_main_info(bot, update, user):
         '\n'.join([' ' + x['first_name'] + ' ' + x['last_name'] for x in teammates])) if teammates else ''
 
     number_of_add_games = 'Количество отыгрышей: <b>{}</b>\n\n'.format(user.bonus_lesson)
+    should_pay_info = ''
 
     today = date.today()
     number_of_days_in_month = monthrange(today.year, today.month)[1]
@@ -116,14 +120,16 @@ def user_main_info(bot, update, user):
     number_of_days_in_next_month = monthrange(next_month.year, next_month.month)[1]
     last_day_in_next_month = date(next_month.year, next_month.month, number_of_days_in_next_month)
 
-    # should_pay = GroupTrainingDay.objects.filter(group__users__in=[user],
-    #                                              date__gte=next_month,
-    #                                              date__lte=last_day_in_next_month).annotate(
-    #     lesson_tarif=F('group__tarif__price_per_hour')).aggregate(sigma=Sum('lesson_tarif'))
-    # should_pay_money = should_pay['sigma'] if should_pay['sigma'] else 0
-    # should_pay_info = 'В следующем месяце <b>нужно заплатить {} ₽</b>.'.format(should_pay_money)
+    tr_days_num = GroupTrainingDay.objects.filter(Q(group__users__in=[user]) | Q(visitors__in=[user]),
+                                                  is_available=True,
+                                                  date__gte=next_month,
+                                                  date__lte=last_day_in_next_month).count()
+    should_pay_money = tr_days_num * User.tarif_for_status[user.status]
+    should_pay_info = 'В следующем месяце ({}) <b>нужно заплатить {} ₽</b>.'.format(
+        from_digit_to_month[next_month.month], should_pay_money)
+
     # todo: сделать нормальный подсчет оплаты -- уточнить У Влада, как это считается для каждого статуса
-    text = intro + group_info + number_of_add_games
+    text = intro + group_info + number_of_add_games + should_pay_info
 
     bot.send_message(user.id,
                      text,

@@ -12,6 +12,7 @@ import telegram
 import sys
 import logging
 
+
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -101,10 +102,9 @@ def get_available_dt_time4ind_train(duration: float):
         poss_date += timedelta(days=1)
         possible_dates.append(poss_date)
 
-    tr_days = GroupTrainingDay.objects.filter(is_available=True, date__in=possible_dates,
-                                              start_time__gte=start_time).annotate(
-        end_time=ExpressionWrapper(F('start_time') + F('duration'),
-                                   output_field=DateTimeField()),
+    tr_days = GroupTrainingDay.objects.tr_day_is_my_available().filter(date__in=possible_dates,
+                                                                       start_time__gte=start_time).annotate(
+        end_time=ExpressionWrapper(F('start_time') + F('duration'), output_field=DateTimeField()),
         date_tmp=TruncDate('date')).values('date_tmp', 'start_time', 'end_time').order_by('date', 'start_time')
     poss_date_time_dict = {day['date_tmp']: possible_times[:] for day in tr_days}
 
@@ -136,7 +136,8 @@ def get_available_dt_time4ind_train(duration: float):
 
 def select_tr_days_for_skipping(user):
     tmp = GroupTrainingDay.objects.filter(Q(group__users__in=[user]) | Q(visitors__in=[user]),
-                                          date__gt=date.today()).exclude(absent__in=[user]).order_by('id').distinct(
+                                                                   date__gt=date.today()).exclude(
+        absent__in=[user]).order_by('id').distinct(
         'id').values('date', 'start_time')
     available_grouptraining_dates = [x['date'] for x in tmp  # учитываем время до отмены
                                      if datetime.combine(x['date'],
@@ -146,7 +147,7 @@ def select_tr_days_for_skipping(user):
 
 
 def get_potential_days_for_group_training(user):
-    potential_free_places = GroupTrainingDay.objects.annotate(
+    potential_free_places = GroupTrainingDay.objects.tr_day_is_my_available().annotate(
         n_absent=Count('absent'),
         max_players=F('group__max_players'),
         n_players=Count('group__users'),

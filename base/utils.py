@@ -1,5 +1,6 @@
 import datetime
 import re
+import telegram
 from calendar import monthrange
 
 from telegram import (ReplyKeyboardMarkup,
@@ -18,6 +19,10 @@ TM_HOUR_BOT_FORMAT = '%H'
 TM_DAY_BOT_FORMAT = '%d'
 TM_TIME_SCHEDULE_FORMAT = '%H:%M'
 
+from_digit_to_month = {
+        1: 'Январь', 2: 'Февраль', 3: 'Март', 4: 'Апрель', 5: 'Май', 6: 'Июнь',
+        7: 'Июль', 8: 'Август', 9: 'Сентябрь', 10: 'Октябрь', 11: 'Ноябрь', 12: 'Декабрь',
+    }
 
 def construct_main_menu():
     return ReplyKeyboardMarkup([
@@ -57,11 +62,6 @@ def construct_dt_menu(button_text, dates, date=None):
     day = date.day
     prev_dt = date - datetime.timedelta(days=day + 1)
     next_dt = date + datetime.timedelta(days=number_of_days_in_month-day + 1)
-
-    from_digit_to_month = {
-        1: 'Январь', 2: 'Февраль', 3: 'Март', 4: 'Апрель', 5: 'Май', 6: 'Июнь',
-        7: 'Июль', 8: 'Август', 9: 'Сентябрь', 10: 'Октябрь', 11: 'Ноябрь', 12: 'Декабрь',
-    }
 
     if len(months) > 1:
         if months.index(int(month)) == 0:
@@ -144,3 +144,26 @@ def construct_time_menu_4ind_lesson(button_text, poss_training_times: list, day:
     ])
 
     return inlinemark(buttons)
+
+
+def send_alert_about_changing_tr_day_status(tr_day, new_is_available: bool, bot):
+    group_members = tr_day.group.users.all()
+    visitors = tr_day.visitors.all()
+
+    if not new_is_available:
+        text = 'Тренировка <b>{} в {}</b> отменена.'.format(tr_day.date,
+                                                            tr_day.start_time)
+    else:
+        text = 'Тренировка <b>{} в {}</b> доступна, ура!'.format(tr_day.date,
+                                                                 tr_day.start_time)
+    # todo: сделать нормальную отправку сообщений (как в Post Market)
+    for player in group_members.union(visitors):
+        try:
+            bot.send_message(player.id,
+                             text,
+                             reply_markup=construct_main_menu(),
+                             parse_mode='HTML')
+        except (telegram.error.Unauthorized, telegram.error.BadRequest):
+            player.is_blocked = True
+            player.status = 'F'
+            player.save()

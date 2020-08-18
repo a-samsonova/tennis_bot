@@ -7,14 +7,23 @@ from datetime import timedelta, datetime
 from base.utils import construct_main_menu
 from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
+
+from base.utils import send_alert_about_changing_tr_day_status
 from tennis_bot.config import TELEGRAM_TOKEN
 
 import telegram
 
 
+class ModelwithTimeManager(models.Manager):
+    def tr_day_is_my_available(self, *args, **kwargs):
+        return self.filter(is_available=True, tr_day_status=GroupTrainingDay.MY_TRAIN_STATUS, *args, **kwargs)
+
+
 class ModelwithTime(models.Model):
     dttm_added = models.DateTimeField(default=timezone.now)
     dttm_deleted = models.DateTimeField(null=True, blank=True)
+
+    objects = ModelwithTimeManager()
 
     class Meta:
         abstract = True
@@ -48,8 +57,8 @@ class User(AbstractUser):
     is_blocked = models.BooleanField(default=False)
     status = models.CharField(max_length=1, choices=STATUSES, default=STATUS_WAITING, verbose_name='статус')
 
-    time_before_cancel = models.DurationField(null=True, help_text='ДНИ ЧАСЫ:МИНУТЫ:СЕКУНДЫ',
-                                              verbose_name='Время, за которое нужно предупредить')
+    time_before_cancel = models.DurationField(null=True, help_text='ЧАСЫ:МИНУТЫ:СЕКУНДЫ',
+                                              verbose_name='Время, за которое нужно предупредить', default='6:0:0')
     bonus_lesson = models.SmallIntegerField(null=True, blank=True, default=0, verbose_name='Количество отыгрышей')
 
     add_info = models.CharField(max_length=128, null=True, blank=True, verbose_name='Доп. информация')
@@ -104,15 +113,26 @@ class TrainingGroupForm(forms.ModelForm):
                                   format(max_players, users.count())})
 
 
-class GroupTrainingDay(models.Model):
+class GroupTrainingDay(ModelwithTime):
+    MY_TRAIN_STATUS = 'M'
+    RENT_TRAIN_STATUS = 'R'
+
+    TR_DAY_STATUSES = (
+        (MY_TRAIN_STATUS, 'моя тренировка'),
+        (RENT_TRAIN_STATUS, 'аренда')
+    )
+
     group = models.ForeignKey(TrainingGroup, on_delete=models.PROTECT, verbose_name='Группа')
-    absent = models.ManyToManyField(User, blank=True, help_text='Кто сегодня отсутствует')
+    absent = models.ManyToManyField(User, blank=True, help_text='Кто сегодня отсутствует', verbose_name='Отсутствующие')
     date = models.DateField(default=timezone.now, verbose_name='Дата Занятия')
     is_available = models.BooleanField(default=True, help_text='Будет ли в этот день тренировка у этой группы')
     start_time = models.TimeField(null=True, help_text='ЧАСЫ:МИНУТЫ:СЕКУНДЫ', verbose_name='Время начала занятия')
     duration = models.DurationField(null=True, default='1:0:0', help_text='ЧАСЫ:МИНУТЫ:СЕКУНДЫ',
                                     verbose_name='Продолжительность занятия')
-    visitors = models.ManyToManyField(User, blank=True, help_text='Пришли из других групп\n', related_name='visitors')
+    visitors = models.ManyToManyField(User, blank=True, help_text='Пришли из других групп\n', related_name='visitors',
+                                      verbose_name='Игроки из других групп')
+    tr_day_status = models.CharField(max_length=1, default=MY_TRAIN_STATUS, help_text='Моя тренировка или аренда',
+                                     choices=TR_DAY_STATUSES, verbose_name='Статус')
 
     class Meta:
         ordering = ['-date']
@@ -126,7 +146,7 @@ class GroupTrainingDay(models.Model):
 class GroupTrainingDayForm(forms.ModelForm):
     class Meta:
         model = GroupTrainingDay
-        fields = ['group', 'absent', 'visitors', 'date', 'is_available', 'start_time', 'duration']
+        fields = ['group', 'absent', 'visitors', 'date', 'is_available', 'tr_day_status', 'start_time', 'duration']
 
     def clean(self):
         group = self.cleaned_data.get('group')
@@ -152,23 +172,9 @@ class GroupTrainingDayForm(forms.ModelForm):
                     raise ValidationError('Нельзя добавить тренировку на это время в этот день, т.к. уже есть запись на {}'\
                                           ' с продолжительностью {}.'.format(train.start_time, train.duration))
 
-        if 'is_available' in self.changed_data and self.instance.is_available:
-            # если тренировка была доступна, а потом перестала быть таковой:
-            group_members = self.instance.group.users.all()
-            visitors = self.instance.visitors.all()
+        if 'is_available' in self.changed_data:
             bot = telegram.Bot(TELEGRAM_TOKEN)
-            # todo: сделать нормальную отправку сообщений (как в Post Market)
-            for player in group_members.union(visitors):
-                try:
-                    bot.send_message(player.id,
-                                     'Тренировка <b>{} в {}</b> отменена.'.format(self.instance.date,
-                                                                                  self.instance.start_time),
-                                     reply_markup=construct_main_menu(),
-                                     parse_mode='HTML')
-                except (telegram.error.Unauthorized, telegram.error.BadRequest):
-                    player.is_blocked = True
-                    player.status = User.STATUS_FINISHED
-                    player.save()
+            send_alert_about_changing_tr_day_status(self.instance, self.cleaned_data.get('is_available'), bot)
 
 
 class Channel(models.Model):

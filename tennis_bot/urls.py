@@ -15,7 +15,9 @@ Including another URLconf
 """
 from django.conf.urls import url
 from django.contrib import admin
+from base.views import home_redirect
 
 urlpatterns = [
     url(r'^admin/', admin.site.urls),
+    url(r'^$', home_redirect, name='home')
 ]
