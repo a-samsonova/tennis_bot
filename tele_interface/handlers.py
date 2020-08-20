@@ -68,7 +68,7 @@ def get_personal_data(bot, update, user):
             admins = User.objects.filter(is_staff=True)
 
             for admin in admins:
-                admin_bot.send_message(admin.username,
+                admin_bot.send_message(admin.id,
                                        # todo: сделать вместо ссылки кнопки при отправке этого сообешния
                                        'Пришел новый клиент:\n<b>{}</b>\n<a href="http://vladlen82.fvds.ru/admin/base/user/{}/change/">Настроить данные </a>'.format(
                                            user, user.id),
