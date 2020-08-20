@@ -22,6 +22,7 @@ class UserAdmin(admin.ModelAdmin):
     list_display = ('id', 'first_name', 'last_name', 'phone_number', 'status')
     search_fields = ('first_name', 'last_name')
     list_filter = ('status',)
+    ordering = ['first_name']
 
 
 @admin.register(TrainingGroup)
