@@ -5,7 +5,7 @@ from base.utils import (construct_main_menu,
                         construct_dt_menu,
                         construct_time_menu_for_group_lesson,
                         construct_time_menu_4ind_lesson,
-                        from_digit_to_month,)
+                        from_digit_to_month, send_message, )
 from base.models import (User,
                          GroupTrainingDay,
                          TrainingGroup,)
@@ -128,7 +128,6 @@ def user_main_info(bot, update, user):
     should_pay_info = 'В следующем месяце ({}) <b>нужно заплатить {} ₽</b>.'.format(
         from_digit_to_month[next_month.month], should_pay_money)
 
-    # todo: сделать нормальный подсчет оплаты -- уточнить У Влада, как это считается для каждого статуса
     text = intro + group_info + number_of_add_games + should_pay_info
 
     bot.send_message(user.id,
@@ -325,17 +324,8 @@ def select_precise_ind_lesson_time(bot, update, user):
            f"Хочет прийти на индивидуальное занятие <b>{day_dt} ({day_of_week}) </b>" \
            f" в <b>{start_time} — {end_time}</b>\n" \
            f"<b>Разрешить?</b>"
-    # todo: сделать нормальную отправку сообщений (как в Post Market)
-    for admin in admins:
-        try:
-            admin_bot.send_message(admin.id,
-                                   text,
-                                   parse_mode='HTML',
-                                   reply_markup=inline_markup(buttons))
-        except (telegram.error.Unauthorized, telegram.error.BadRequest):
-            admin.is_blocked = True
-            admin.status = User.STATUS_FINISHED
-            admin.save()
+
+    send_message(admins, text, admin_bot, markup=inline_markup(buttons))
 
 
 @handler_decor()

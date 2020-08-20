@@ -1,5 +1,6 @@
 from base.models import User
 from functools import wraps
+from tennis_bot.settings import DEBUG
 import telegram
 import sys
 import logging
@@ -18,7 +19,8 @@ def admin_handler_decor():
         @wraps(func)
         def wrapper(bot, update):
 
-            logger.info(str(update) + '\n {}'.format(func.__name__))
+            if DEBUG:
+                logger.info(str(update) + '\n {}'.format(func.__name__))
 
             if update.callback_query:
                 user_details = update.callback_query.from_user

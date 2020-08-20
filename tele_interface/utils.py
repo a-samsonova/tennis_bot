@@ -8,6 +8,7 @@ from django.db.models.functions import TruncDate
 
 from base.models import (User,
                          GroupTrainingDay, )
+from tennis_bot.settings import DEBUG
 import telegram
 import sys
 import logging
@@ -29,7 +30,8 @@ def handler_decor(check_status=False):
         @wraps(func)
         def wrapper(bot, update):
 
-            logger.info(str(update) + '\n {}'.format(func.__name__))
+            if DEBUG:
+                logger.info(str(update) + '\n {}'.format(func.__name__))
 
             if update.callback_query:
                 user_details = update.callback_query.from_user

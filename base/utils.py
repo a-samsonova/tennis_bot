@@ -24,6 +24,21 @@ from_digit_to_month = {
         7: 'Июль', 8: 'Август', 9: 'Сентябрь', 10: 'Октябрь', 11: 'Ноябрь', 12: 'Декабрь',
     }
 
+
+def send_message(users, message: str, bot, markup=None):
+    reply_markup = markup if markup else construct_main_menu()
+    for user in users:
+        try:
+            bot.send_message(user.id,
+                             message,
+                             reply_markup=reply_markup,
+                             parse_mode='HTML')
+        except (telegram.error.Unauthorized, telegram.error.BadRequest):
+            user.is_blocked = True
+            user.status = 'F'
+            user.save()
+
+
 def construct_main_menu():
     return ReplyKeyboardMarkup([
         ['Мои данные'],
@@ -156,14 +171,5 @@ def send_alert_about_changing_tr_day_status(tr_day, new_is_available: bool, bot)
     else:
         text = 'Тренировка <b>{} в {}</b> доступна, ура!'.format(tr_day.date,
                                                                  tr_day.start_time)
-    # todo: сделать нормальную отправку сообщений (как в Post Market)
-    for player in group_members.union(visitors):
-        try:
-            bot.send_message(player.id,
-                             text,
-                             reply_markup=construct_main_menu(),
-                             parse_mode='HTML')
-        except (telegram.error.Unauthorized, telegram.error.BadRequest):
-            player.is_blocked = True
-            player.status = 'F'
-            player.save()
+
+    send_message(group_members.union(visitors), text, bot)
