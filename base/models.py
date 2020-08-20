@@ -221,9 +221,10 @@ def create_group_for_arbitrary(sender, instance, created, **kwargs):
         Если игрок ходит по свободному графику, то создадим
         для него группу, состояющую только из него.
     """
-    if created and instance.status == User.STATUS_ARBITRARY:
-        group = TrainingGroup(name=instance.first_name + instance.last_name, max_players=1)
-        group.users.add(instance)
+    if instance.status == User.STATUS_ARBITRARY:
+        group = TrainingGroup.objects.update_or_create(name=instance.first_name + instance.last_name, max_players=1)
+        if not group.users.count():
+            group.users.add(instance)
 
 
 

@@ -7,12 +7,13 @@ bot = telegram.Bot(TELEGRAM_TOKEN)
 
 class UserTabularInline(admin.StackedInline):
     model = TrainingGroup.users.through
+    max_num = 1
 
     def has_delete_permission(self, request, obj=None):
         return False
 
     def has_add_permission(self, request, obj=None):
-        return False
+        return True
 
 
 @admin.register(User)
