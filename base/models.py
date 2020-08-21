@@ -4,7 +4,7 @@ from django.core.exceptions import ValidationError
 from django import forms
 from django.utils import timezone
 from datetime import timedelta, datetime
-from base.utils import construct_main_menu
+from base.utils import construct_main_menu, send_message
 from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
 
@@ -82,9 +82,7 @@ class UserForm(forms.ModelForm):
             new_status = self.cleaned_data.get('status')
             if self.instance.status == User.STATUS_WAITING and (new_status == User.STATUS_ARBITRARY or new_status == User.STATUS_TRAINING):
                 bot = telegram.Bot(TELEGRAM_TOKEN)
-                bot.send_message(self.instance.id,
-                                 'Теперь тебе доступен мой функционал, поздравляю!',
-                                 reply_markup=construct_main_menu())
+                send_message([self.instance], 'Теперь тебе доступен мой функционал, поздравляю!', bot)
 
 
 class TrainingGroup(ModelwithTime):
@@ -222,7 +220,7 @@ def create_group_for_arbitrary(sender, instance, created, **kwargs):
         для него группу, состояющую только из него.
     """
     if instance.status == User.STATUS_ARBITRARY:
-        group = TrainingGroup.objects.update_or_create(name=instance.first_name + instance.last_name, max_players=1)
+        group, _= TrainingGroup.objects.update_or_create(name=instance.first_name + instance.last_name, max_players=1)
         if not group.users.count():
             group.users.add(instance)
 

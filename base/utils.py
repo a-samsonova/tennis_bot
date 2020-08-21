@@ -26,6 +26,13 @@ from_digit_to_month = {
 
 
 def send_message(users, message: str, bot, markup=None):
+    """
+    :param users: instance of User model, iterable object
+    :param message: text
+    :param bot: instance of telegram.Bot
+    :param markup: telegram markup
+    :return: send message to users in telegram bot
+    """
     reply_markup = markup if markup else construct_main_menu()
     for user in users:
         try:
