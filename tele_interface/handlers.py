@@ -111,7 +111,6 @@ def user_main_info(bot, update, user):
         '\n'.join([' ' + x['first_name'] + ' ' + x['last_name'] for x in teammates])) if teammates else ''
 
     number_of_add_games = 'Количество отыгрышей: <b>{}</b>\n\n'.format(user.bonus_lesson)
-    should_pay_info = ''
 
     today = date.today()
     number_of_days_in_month = monthrange(today.year, today.month)[1]

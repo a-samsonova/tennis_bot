@@ -2,6 +2,10 @@ from_eng_to_rus_day_week = {
     'Sunday': 'воскресенье', 'Monday': 'понедельник', 'Tuesday': 'вторник', 'Wednesday': 'среда',
     'Thursday': 'четверг', 'Friday': 'пятница', 'Saturday': 'суббота'
 }
+ADMIN_TIME_SCHEDULE_BUTTON = 'Расписание'
+
+SELECT_DAY_TO_SHOW_COACH_SCHEDULE = 'COACH_SCHEDULE'
+SHOW_GROUPDAY_INFO = 'GROUPDAY_INFO'
 
 SET_UP_TIME_BEFORE_CANCEL_BUTTON = 'TIME_BEFORE_CANCEL'
 SET_UP_PLAYER_STATUS = 'PLAYER_STATUS'
@@ -18,3 +22,5 @@ SELECT_DURATION_FOR_IND_TRAIN = 'SELECT_DURATION_FOR_IND_TRAIN'
 SELECT_IND_LESSON_TIME = 'SELECT_IND_LESSON_TIME'
 SELECT_PRECISE_IND_TIME = 'IND_TIME'
 PERMISSION_FOR_IND_TRAIN = 'PERMISSION_IND_TRAIN'
+
+
