@@ -23,6 +23,7 @@ from tele_interface.handlers import (
     select_dt_for_ind_lesson,
     choose_dt_time_for_ind_train,
     select_precise_ind_lesson_time,
+    confirm_group_lesson
 )
 from tele_interface.manage_data import (
     SELECT_SKIP_TIME_BUTTON,
@@ -32,6 +33,7 @@ from tele_interface.manage_data import (
     SELECT_DURATION_FOR_IND_TRAIN,
     SELECT_IND_LESSON_TIME,
     SELECT_PRECISE_IND_TIME,
+    CONFIRM_GROUP_LESSON
 )
 from tennis_bot.config import TELEGRAM_TOKEN
 
@@ -56,6 +58,7 @@ def add_handlers(updater):
     dp.add_handler(CallbackQueryHandler(choose_dt_time_for_ind_train, pattern='^{}'.format(SELECT_IND_LESSON_TIME)))
     dp.add_handler(CallbackQueryHandler(select_precise_ind_lesson_time, pattern='^{}'.format(SELECT_PRECISE_IND_TIME)))
     dp.add_handler(CallbackQueryHandler(choose_type_of_training, pattern='^{}'.format("Записаться на занятие")))
+    dp.add_handler(CallbackQueryHandler(confirm_group_lesson, pattern='^{}'.format(CONFIRM_GROUP_LESSON)))
 
 
 def main():

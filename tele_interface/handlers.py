@@ -18,7 +18,7 @@ from .manage_data import (
     SELECT_DURATION_FOR_IND_TRAIN,
     SELECT_IND_LESSON_TIME,
     SELECT_PRECISE_IND_TIME,
-    PERMISSION_FOR_IND_TRAIN,
+    PERMISSION_FOR_IND_TRAIN, CONFIRM_GROUP_LESSON,
 )
 from calendar import monthrange
 from tennis_bot.config import ADMIN_TELEGRAM_TOKEN
@@ -360,26 +360,87 @@ def choose_dt_for_group_lesson(bot, update, user):
 
 @handler_decor()
 def select_precise_group_lesson_time(bot, update, user):
+    """
+    после того, как выбрал точное время для групповой тренировки,
+    показываем инфу об этом дне с кнопкой записаться и назад
+    :param bot:
+    :param update:
+    :param user:
+    :return:
+    """
+
     tr_day_id = update.callback_query.data[len(SELECT_PRECISE_GROUP_TIME):]
-    tr_day = GroupTrainingDay.objects.get(id=tr_day_id)
+    tr_day = GroupTrainingDay.objects.select_related('group').get(id=tr_day_id)
     start_time = tr_day.start_time.strftime(TM_TIME_SCHEDULE_FORMAT)
     end_time = (datetime.combine(tr_day.date, tr_day.start_time) + tr_day.duration).strftime(
         TM_TIME_SCHEDULE_FORMAT)
 
     day_of_week = calendar.day_name[tr_day.date.weekday()]
 
-    tr_day.visitors.add(user)
+    #сколько сейчас свободных мест
+    n_free_places = tr_day.group.max_players - tr_day.visitors.count() + tr_day.absent.count() - tr_day.group.users.count()
+    all_players = tr_day.group.users.union(tr_day.visitors.all()).difference(tr_day.absent.all()).values('first_name',
+                                                                                                         'last_name')
+
+    all_players = '\n'.join((f"{x['first_name']} {x['last_name']}" for x in all_players))
+    text = f'{tr_day.group.name}\n' \
+           f'📅Дата: <b>{tr_day.date.strftime(DT_BOT_FORMAT)} ({from_eng_to_rus_day_week[day_of_week]})</b>\n' \
+           f'⏰Время: <b>{start_time} — {end_time}</b>\n\n' \
+           f'👥Присутствующие:\n{all_players}\n\n' \
+           f'Свободных мест: {n_free_places}'
+
+    buttons = [[
+        inline_button('Записаться', callback_data=f"{CONFIRM_GROUP_LESSON}{tr_day_id}")
+    ], [
+        inline_button('⬅️ назад',
+                      callback_data=SELECT_GROUP_LESSON_TIME + tr_day.date.strftime(DT_BOT_FORMAT) + '|month')
+    ]]
 
     bot.edit_message_text(
-        f'Записал тебя на <b>{tr_day.date.strftime(DT_BOT_FORMAT)} ({from_eng_to_rus_day_week[day_of_week]})</b>\n'
-        f'Время: <b>{start_time} — {end_time}</b>',
+        text,
         chat_id=update.callback_query.message.chat_id,
         message_id=update.callback_query.message.message_id,
         parse_mode='HTML',
+        reply_markup=inline_markup(buttons)
     )
-    if user.bonus_lesson > 0:
-        user.bonus_lesson -= 1
-        user.save()
 
 
 
+@handler_decor()
+def confirm_group_lesson(bot, update, user):
+    tr_day_id = update.callback_query.data[len(CONFIRM_GROUP_LESSON):]
+    tr_day = GroupTrainingDay.objects.select_related('group').get(id=tr_day_id)
+    start_time = tr_day.start_time.strftime(TM_TIME_SCHEDULE_FORMAT)
+    end_time = (datetime.combine(tr_day.date, tr_day.start_time) + tr_day.duration).strftime(
+        TM_TIME_SCHEDULE_FORMAT)
+
+    day_of_week = calendar.day_name[tr_day.date.weekday()]
+
+    n_free_places = tr_day.group.max_players - tr_day.visitors.count() + tr_day.absent.count() - tr_day.group.users.count()
+
+    if n_free_places:
+        tr_day.visitors.add(user)
+
+        text = f'Записал тебя на <b>{tr_day.date.strftime(DT_BOT_FORMAT)} ({from_eng_to_rus_day_week[day_of_week]})</b>\n' \
+               f'Время: <b>{start_time} — {end_time}</b>'
+
+        markup = None
+
+        if user.bonus_lesson > 0:
+            user.bonus_lesson -= 1
+            user.save()
+    else:
+        text = 'Упс, похоже уже не осталось свободных мест на это время, выбери другое.'
+        buttons = [[
+            inline_button('⬅️ назад',
+                          callback_data=SELECT_GROUP_LESSON_TIME + tr_day.date.strftime(DT_BOT_FORMAT) + '|month')
+        ]]
+        markup = inline_markup(buttons)
+
+    bot.edit_message_text(
+        text,
+        chat_id=update.callback_query.message.chat_id,
+        message_id=update.callback_query.message.message_id,
+        parse_mode='HTML',
+        reply_markup=markup
+    )
