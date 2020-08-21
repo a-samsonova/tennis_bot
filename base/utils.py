@@ -11,7 +11,8 @@ from tele_interface.manage_data import (
     SELECT_GROUP_LESSON_TIME,
     SELECT_IND_LESSON_TIME,
     SELECT_TRAINING_TYPE,
-    SELECT_SKIP_TIME_BUTTON,)
+    SELECT_SKIP_TIME_BUTTON,
+    ADMIN_TIME_SCHEDULE_BUTTON, SELECT_DAY_TO_SHOW_COACH_SCHEDULE, )
 
 DTTM_BOT_FORMAT = '%Y.%m.%d.%H.%M'
 DT_BOT_FORMAT = '%Y.%m.%d'
@@ -50,6 +51,12 @@ def construct_main_menu():
     return ReplyKeyboardMarkup([
         ['Мои данные'],
         ['Пропустить занятие', 'Записаться на занятие']],
+        resize_keyboard=True)
+
+
+def construct_admin_main_menu():
+    return ReplyKeyboardMarkup([
+        [ADMIN_TIME_SCHEDULE_BUTTON]],
         resize_keyboard=True)
 
 
@@ -112,7 +119,7 @@ def construct_dt_menu(button_text, dates, date=None):
         ])
     back_data = SELECT_TRAINING_TYPE + 'ind' if re.findall(r'^{}'.format(SELECT_IND_LESSON_TIME),
                                                            button_info) else 'Записаться на занятие'
-    if not re.findall(r'^{}'.format(SELECT_SKIP_TIME_BUTTON), button_info):
+    if not re.findall(r'^{}'.format(SELECT_SKIP_TIME_BUTTON), button_info) and not re.findall(r'^{}'.format(SELECT_DAY_TO_SHOW_COACH_SCHEDULE), button_info):
         buttons.append([
             inlinebutt('⬅️ назад',
                        callback_data=back_data),
