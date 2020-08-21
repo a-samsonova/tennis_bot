@@ -170,9 +170,20 @@ class GroupTrainingDayForm(forms.ModelForm):
                     raise ValidationError('Нельзя добавить тренировку на это время в этот день, т.к. уже есть запись на {}'\
                                           ' с продолжительностью {}.'.format(train.start_time, train.duration))
 
-        if 'is_available' in self.changed_data:
-            bot = telegram.Bot(TELEGRAM_TOKEN)
+        bot = telegram.Bot(TELEGRAM_TOKEN)
+        if 'is_available' in self.changed_data: #если статут дня меняется, то отсылаем алерт об изменении
             send_alert_about_changing_tr_day_status(self.instance, self.cleaned_data.get('is_available'), bot)
+
+        if 'visitors' in self.changed_data:
+            if self.cleaned_data.get('visitors').count() < self.instance.visitors.count():
+                canceled_users = self.instance.visitors.all().exclude(id__in=self.cleaned_data.get('visitors').values('id'))
+                text = f'😱ATTENTION😱\n' \
+                       f'У тебя есть запись на тренировку на <b> {self.cleaned_data.get("date")}.</b>\n' \
+                       f'<b>Тренер ее отменил.</b> Но не отчаивайся, я добавлю тебе отыгрыш 🎾'
+                send_message(canceled_users, text, bot)
+                for player in canceled_users:
+                    player.bonus_lesson += 1
+                    player.save()
 
 
 class Channel(models.Model):
@@ -220,7 +231,7 @@ def create_group_for_arbitrary(sender, instance, created, **kwargs):
         для него группу, состояющую только из него.
     """
     if instance.status == User.STATUS_ARBITRARY:
-        group, _= TrainingGroup.objects.update_or_create(name=instance.first_name + instance.last_name, max_players=1)
+        group, _ = TrainingGroup.objects.update_or_create(name=instance.first_name + instance.last_name, max_players=1)
         if not group.users.count():
             group.users.add(instance)
 

@@ -90,12 +90,13 @@ def handler_decor(check_status=False):
 
 
 def get_available_dt_time4ind_train(duration: float):
+    # todo: какой-то пиздец, без пол литра не разберешься, хз шо с этим делать
     poss_date = date.today()
     start_time = time(8, 0, 0)
 
     possible_times = []
-    for i in range(8, 21):
-        for minute in [0, 30]:
+    for i in range(8, 21): #занятия могут идти с 8 до 20
+        for minute in [0, 30]: #с интервалом 30 минут
             possible_times.append(time(i, minute))
     del possible_times[-1]
 
@@ -108,6 +109,8 @@ def get_available_dt_time4ind_train(duration: float):
                                                                        start_time__gte=start_time).annotate(
         end_time=ExpressionWrapper(F('start_time') + F('duration'), output_field=DateTimeField()),
         date_tmp=TruncDate('date')).values('date_tmp', 'start_time', 'end_time').order_by('date', 'start_time')
+
+    #todo: полное копирование списка, мдэээ, надо что-то с этим делать
     poss_date_time_dict = {day['date_tmp']: possible_times[:] for day in tr_days}
 
     for day in tr_days:

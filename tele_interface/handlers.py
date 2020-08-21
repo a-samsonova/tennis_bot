@@ -180,7 +180,7 @@ def choose_type_of_training(bot, update, user):
     buttons = [[
         inline_button('Индивидуальная', callback_data=SELECT_TRAINING_TYPE + 'ind')
     ], [
-        inline_button('Групповя', callback_data=SELECT_TRAINING_TYPE + 'group')
+        inline_button('Групповая', callback_data=SELECT_TRAINING_TYPE + 'group')
     ]]
     text = 'Выбери тип тренировки.'
     if update.callback_query:
