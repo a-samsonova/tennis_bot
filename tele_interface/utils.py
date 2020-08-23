@@ -105,8 +105,8 @@ def get_available_dt_time4ind_train(duration: float):
         poss_date += timedelta(days=1)
         possible_dates.append(poss_date)
 
-    tr_days = GroupTrainingDay.objects.tr_day_is_my_available().filter(date__in=possible_dates,
-                                                                       start_time__gte=start_time).annotate(
+    #почему я ищу только среди существующих tr_days --- хз
+    tr_days = GroupTrainingDay.objects.filter(date__in=possible_dates, start_time__gte=start_time).annotate(
         end_time=ExpressionWrapper(F('start_time') + F('duration'), output_field=DateTimeField()),
         date_tmp=TruncDate('date')).values('date_tmp', 'start_time', 'end_time').order_by('date', 'start_time')
 
@@ -141,7 +141,7 @@ def get_available_dt_time4ind_train(duration: float):
 
 def select_tr_days_for_skipping(user):
     tmp = GroupTrainingDay.objects.filter(Q(group__users__in=[user]) | Q(visitors__in=[user]),
-                                                                   date__gt=date.today()).exclude(
+                                          date__gt=date.today()).exclude(
         absent__in=[user]).order_by('id').distinct(
         'id').values('date', 'start_time')
     available_grouptraining_dates = [x['date'] for x in tmp  # учитываем время до отмены
