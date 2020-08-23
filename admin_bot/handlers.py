@@ -55,7 +55,6 @@ def permission_for_ind_train(bot, update, user):
         admin_text,
         chat_id=update.callback_query.message.chat_id,
         message_id=update.callback_query.message.message_id,
-        reply_markup=construct_admin_main_menu()
     )
 
     tennis_bot.send_message(
