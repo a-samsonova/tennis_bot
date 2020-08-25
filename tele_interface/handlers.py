@@ -200,9 +200,8 @@ def take_lesson(bot, update, user):
     """записаться на тренировку"""
     tr_type = update.callback_query.data[len(SELECT_TRAINING_TYPE):]
     if tr_type == 'group':
-
-        potential_free_places = get_potential_days_for_group_training(user)
-        potential_free_places = potential_free_places.filter(date__gt=datetime.now())
+        potential_free_places = get_potential_days_for_group_training(user).filter(
+            date__gte=datetime.now() + timedelta(hours=3))
         days_with_free_places = list(set([x.date for x in potential_free_places]))
         buttons = construct_dt_menu(SELECT_GROUP_LESSON_TIME + '*' + str(date.today().month),
                                     days_with_free_places)

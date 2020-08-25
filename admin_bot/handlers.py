@@ -30,37 +30,44 @@ def permission_for_ind_train(bot, update, user):
     tennis_bot = telegram.Bot(TELEGRAM_TOKEN)
 
     player = User.objects.get(id=user_id)
-    tr_day = GroupTrainingDay.objects.get(id=tr_day_id)
 
-    start_time = tr_day.start_time.strftime(TM_TIME_SCHEDULE_FORMAT)
-    end_time = (datetime.datetime.combine(tr_day.date, tr_day.start_time) + tr_day.duration).time().strftime(TM_TIME_SCHEDULE_FORMAT)
+    tr_day = GroupTrainingDay.objects.filter(id=tr_day_id)
 
-    if permission == 'yes':
-        admin_text = 'Отлично, приятной тренировки!'
+    if tr_day.count():
+        tr_day = tr_day.first()
+        start_time = tr_day.start_time.strftime(TM_TIME_SCHEDULE_FORMAT)
+        end_time = (datetime.datetime.combine(tr_day.date, tr_day.start_time) + tr_day.duration).time().strftime(
+            TM_TIME_SCHEDULE_FORMAT)
 
-        user_text = f'Отлично, тренер подтвердил тренировку <b>{tr_day.date.strftime(DT_BOT_FORMAT)}</b>\n' \
-                    f'Время: <b>{start_time} — {end_time}</b>\n' \
-                    f'Не забудь!'
+        if permission == 'yes':
+            admin_text = 'Отлично, приятной тренировки!'
+
+            user_text = f'Отлично, тренер подтвердил тренировку <b>{tr_day.date.strftime(DT_BOT_FORMAT)}</b>\n' \
+                        f'Время: <b>{start_time} — {end_time}</b>\n' \
+                        f'Не забудь!'
+
+        else:
+            admin_text = 'Хорошо, сообщу игроку, что тренировка отменена.'
+
+            user_text = f'Внимание!!! Индивидуальная тренировка <b> {tr_day.date.strftime(DT_BOT_FORMAT)}</b>\n' \
+                        f'в <b>{start_time} — {end_time}</b>\n' \
+                        f'<b>ОТМЕНЕНА</b>'
+
+            tr_day.delete()
+
+        tennis_bot.send_message(
+            player.id,
+            user_text,
+            parse_mode='HTML'
+        )
 
     else:
-        admin_text = 'Хорошо, сообщу игроку, что тренировка отменена.'
-
-        user_text = f'Внимание!!! Индивидуальная тренировка <b> {tr_day.date.strftime(DT_BOT_FORMAT)}</b>\n' \
-                    f'в <b>{start_time} — {end_time}</b>\n' \
-                    f'<b>ОТМЕНЕНА</b>'
-
-        tr_day.delete()
+        admin_text = 'Тренировка уже отменена.'
 
     bot.edit_message_text(
         admin_text,
         chat_id=update.callback_query.message.chat_id,
         message_id=update.callback_query.message.message_id,
-    )
-
-    tennis_bot.send_message(
-        player.id,
-        user_text,
-        parse_mode='HTML'
     )
 
 
