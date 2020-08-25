@@ -3,7 +3,9 @@ from functools import wraps
 
 from django.db.models import (ExpressionWrapper,
                               F, Q,
-                              DateTimeField, Count, )
+                              DateTimeField,
+                              Count,
+                              DurationField)
 from django.db.models.functions import TruncDate
 
 from base.models import (User,
@@ -156,8 +158,10 @@ def get_potential_days_for_group_training(user):
         n_absent=Count('absent'),
         max_players=F('group__max_players'),
         n_players=Count('group__users'),
-        n_visitors=Count('visitors')).filter(
-        max_players__gt=F('n_visitors') + F('n_players') - F('n_absent')).exclude(
+        n_visitors=Count('visitors'),
+        diff=ExpressionWrapper(F('start_time') + F('date') - datetime.now() - timedelta(hours=3), output_field=DurationField())).filter(
+        max_players__gt=F('n_visitors') + F('n_players') - F('n_absent'),
+        diff__gte=timedelta(hours=1)).exclude(
         Q(visitors__in=[user]) | Q(group__users__in=[user])).order_by('start_time')
 
     return potential_free_places

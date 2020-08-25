@@ -403,7 +403,6 @@ def select_precise_group_lesson_time(bot, update, user):
     )
 
 
-
 @handler_decor()
 def confirm_group_lesson(bot, update, user):
     tr_day_id = update.callback_query.data[len(CONFIRM_GROUP_LESSON):]

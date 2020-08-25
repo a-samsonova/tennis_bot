@@ -193,6 +193,37 @@ class Channel(models.Model):
     token = models.CharField(max_length=256, default='')
 
 
+class Payment(models.Model):
+    JANUARY, FEBRUARY, MARCH, APRIL, MAY, JUNE, JULY, AUGUST, SEPTEMBER = '1', '2', '3', '4', '5', '6', '7', '8', '9'
+    OCTOBER, NOVEMBER, DECEMBER = '10', '11', '12'
+
+    MONTHS = (
+        (JANUARY, 'январь'), (FEBRUARY, 'февраль'), (MARCH, 'март'), (APRIL, 'апрель'), (MAY, 'май'),
+        (JUNE, 'июнь'), (JULY, 'июль'), (AUGUST, 'август'), (SEPTEMBER, 'сентябрь'), (OCTOBER, 'октябрь'),
+        (NOVEMBER, 'ноябрь'), (DECEMBER, 'декабрь')
+    )
+
+    YEAR_2020 = '0'
+    YEAR_2021 = '1'
+
+    YEARS = (
+        (YEAR_2020, '2020'), (YEAR_2021, '2021')
+    )
+
+    player = models.ForeignKey(User, on_delete=models.SET_NULL, verbose_name='игрок', null=True)
+    month = models.CharField(max_length=2, choices=MONTHS, verbose_name='месяц')
+    year = models.CharField(max_length=1, choices=YEARS, verbose_name='год')
+    amount = models.PositiveIntegerField(verbose_name='Сколько заплатил')
+
+    class Meta:
+        ordering = ['year']
+        verbose_name = 'оплата'
+        verbose_name_plural = 'оплата'
+
+    def __str__(self):
+        return f"{self.player}, месяц: {self.month}, рублей: {self.amount}"
+
+
 """раздел с сигналами, в отедльном файле что-то не пошло"""
 
 

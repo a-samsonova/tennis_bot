@@ -75,3 +75,8 @@ class GroupTrainingDayAdmin(admin.ModelAdmin):
         return super(GroupTrainingDayAdmin, self).formfield_for_manytomany(db_field, request, **kwargs)
 
 
+@admin.register(Payment)
+class PaymentAdmin(admin.ModelAdmin):
+    list_display = ('player', 'month', 'year', 'amount')
+    list_filter = ('year', 'month', 'player')
+    search_fields = ('player__first_name', 'player__last_name')
