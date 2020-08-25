@@ -100,7 +100,7 @@ def get_available_dt_time4ind_train(duration: float):
             possible_times.append(time(i, minute))
     del possible_times[-1]
 
-    possible_dates = []
+    possible_dates = [poss_date]
     for _ in range(30): #для индивидуальных тренировок запись доступна примерно на месяц вперед
         poss_date += timedelta(days=1)
         possible_dates.append(poss_date)
