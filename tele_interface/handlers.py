@@ -344,7 +344,7 @@ def choose_dt_for_group_lesson(bot, update, user):
                               message_id=update.callback_query.message.message_id,
                               reply_markup=buttons)
     else:
-        potential_free_places = potential_free_places.filter(date__gt=datetime.now())
+        potential_free_places = potential_free_places.filter(date__gte=datetime.now() + timedelta(hours=3))
         days_with_free_places = list(set([x.date for x in potential_free_places]))
 
         buttons = construct_dt_menu(SELECT_GROUP_LESSON_TIME + '*' + str(date_dt.month),
