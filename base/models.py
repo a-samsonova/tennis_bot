@@ -132,6 +132,8 @@ class GroupTrainingDay(ModelwithTime):
     tr_day_status = models.CharField(max_length=1, default=MY_TRAIN_STATUS, help_text='Моя тренировка или аренда',
                                      choices=TR_DAY_STATUSES, verbose_name='Статус')
 
+    is_individual = models.BooleanField(default=False, help_text='индивидуальная ли тренировка')
+
     class Meta:
         ordering = ['-date']
         verbose_name = 'тренировочный день'
@@ -144,7 +146,8 @@ class GroupTrainingDay(ModelwithTime):
 class GroupTrainingDayForm(forms.ModelForm):
     class Meta:
         model = GroupTrainingDay
-        fields = ['group', 'absent', 'visitors', 'date', 'is_available', 'tr_day_status', 'start_time', 'duration']
+        fields = ['group', 'absent', 'visitors', 'date', 'is_available', 'is_individual', 'tr_day_status', 'start_time',
+                  'duration']
 
     def clean(self):
         group = self.cleaned_data.get('group')

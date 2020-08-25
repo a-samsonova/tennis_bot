@@ -119,6 +119,7 @@ def show_traingroupday_info(bot, update, user):
     tr_day = GroupTrainingDay.objects.select_related('group').get(id=tr_day_id)
 
     availability = '❌нет тренировки❌\n' if not tr_day.is_available else ''
+    is_individual = '🧑🏻‍🦯индивидуальная🧑🏻‍🦯\n' if tr_day.is_individual else '🤼‍♂️групповая🤼‍♂️\n'
     affiliation = '🧔🏻моя тренировка🧔🏻\n\n' if tr_day.tr_day_status == GroupTrainingDay.MY_TRAIN_STATUS else '👥аренда👥\n\n'
 
     group_name = f"{tr_day.group.name}\n"
@@ -136,7 +137,7 @@ def show_traingroupday_info(bot, update, user):
     time = f'{tr_day.start_time.strftime(TM_TIME_SCHEDULE_FORMAT)} — {end_time.strftime(TM_TIME_SCHEDULE_FORMAT)}'
     day_of_week = from_eng_to_rus_day_week[calendar.day_name[tr_day.date.weekday()]]
 
-    general_info = f'<b>{tr_day.date.strftime(DT_BOT_FORMAT)} ({day_of_week})\n{time}</b>' + '\n' + availability + affiliation
+    general_info = f'<b>{tr_day.date.strftime(DT_BOT_FORMAT)} ({day_of_week})\n{time}</b>' + '\n' + availability + is_individual + affiliation
     users_info = group_name + group_players + visitors + absents
     text = general_info + users_info
 

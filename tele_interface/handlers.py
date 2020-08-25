@@ -302,7 +302,8 @@ def select_precise_ind_lesson_time(bot, update, user):
     group, _ = TrainingGroup.objects.get_or_create(name=user.first_name+user.last_name,
                                                    max_players=1)
 
-    tr_day = GroupTrainingDay.objects.create(group=group, date=date_dt, start_time=st_time_obj, duration=duration)
+    tr_day = GroupTrainingDay.objects.create(group=group, date=date_dt, start_time=st_time_obj, duration=duration,
+                                             is_individual=True)
 
     bot.edit_message_text(f"Сообщу тренеру, что ты хочешь прийти на индивидуальное занятие"
                           f" <b>{day_dt} ({day_of_week}) </b>\n"

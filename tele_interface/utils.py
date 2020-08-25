@@ -159,9 +159,11 @@ def get_potential_days_for_group_training(user):
         max_players=F('group__max_players'),
         n_players=Count('group__users'),
         n_visitors=Count('visitors'),
-        diff=ExpressionWrapper(F('start_time') + F('date') - datetime.now() - timedelta(hours=3), output_field=DurationField())).filter(
-        max_players__gt=F('n_visitors') + F('n_players') - F('n_absent'),
-        diff__gte=timedelta(hours=1)).exclude(
-        Q(visitors__in=[user]) | Q(group__users__in=[user])).order_by('start_time')
+        diff=ExpressionWrapper(F('start_time') + F('date') - datetime.now() - timedelta(hours=3),
+                               output_field=DurationField())).filter(
+                                                                    max_players__gt=F('n_visitors') + F('n_players') - F('n_absent'),
+                                                                    diff__gte=timedelta(hours=1),
+                                                                    is_individual=False).exclude(
+                                                                            Q(visitors__in=[user]) | Q(group__users__in=[user])).order_by('start_time')
 
     return potential_free_places
