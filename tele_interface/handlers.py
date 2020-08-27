@@ -1,3 +1,4 @@
+from admin_bot.handlers import info_about_users
 from .utils import (handler_decor,
                     get_available_dt_time4ind_train, select_tr_days_for_skipping,
                     get_potential_days_for_group_training, )
@@ -18,7 +19,9 @@ from .manage_data import (
     SELECT_DURATION_FOR_IND_TRAIN,
     SELECT_IND_LESSON_TIME,
     SELECT_PRECISE_IND_TIME,
-    PERMISSION_FOR_IND_TRAIN, CONFIRM_GROUP_LESSON,
+    PERMISSION_FOR_IND_TRAIN,
+    CONFIRM_GROUP_LESSON,
+    SHOW_INFO_ABOUT_SKIPPING_DAY,
 )
 from calendar import monthrange
 from tennis_bot.config import ADMIN_TELEGRAM_TOKEN
@@ -136,7 +139,7 @@ def user_main_info(bot, update, user):
 
 
 @handler_decor(check_status=True)
-def skip_lesson(bot, update, user):
+def skip_lesson_main_menu_button(bot, update, user):
     available_grouptraining_dates = select_tr_days_for_skipping(user)
     if available_grouptraining_dates:
         buttons = construct_dt_menu(SELECT_SKIP_TIME_BUTTON + '*' + str(date.today().month),
@@ -155,23 +158,77 @@ def choose_dt_for_cancel(bot, update, user):
     date_dt = datetime.strptime(date_btn, DT_BOT_FORMAT)
     if date_type == 'day':
         training_day = GroupTrainingDay.objects.filter(Q(group__users__in=[user]) | Q(visitors__in=[user]),
-                                                       date=date_dt).order_by('id').distinct('id').first()
-        if user in training_day.visitors.all():  # проверяем его ли эта группа или он удаляется из занятия другой группы
-            training_day.visitors.remove(user)
+                                                       date=date_dt).select_related('group').order_by('id').distinct('id').first()
+
+        if not training_day.is_individual:
+            group_name = f"{training_day.group.name}\n"
+            group_players = f'Игроки группы:\n{info_about_users(training_day.group.users)}\n'
         else:
-            training_day.absent.add(user)
-        bot.edit_message_text('Окей, занятие {} отменено'.format(date_btn),
+            group_name = "🧞‍♂индивидуальная тренировка🧞‍♂️\n"
+            group_players = ''
+
+        end_time = datetime.combine(training_day.date, training_day.start_time) + training_day.duration
+        time = f'{training_day.start_time.strftime(TM_TIME_SCHEDULE_FORMAT)} — {end_time.strftime(TM_TIME_SCHEDULE_FORMAT)}'
+        day_of_week = from_eng_to_rus_day_week[calendar.day_name[training_day.date.weekday()]]
+
+        general_info = f'<b>{training_day.date.strftime(DT_BOT_FORMAT)} ({day_of_week})\n{time}\n</b>' + group_name + group_players
+
+        buttons = [[
+            inline_button('Пропустить', callback_data=SHOW_INFO_ABOUT_SKIPPING_DAY + f'{training_day.id}')
+        ], [
+            inline_button('⬅️ назад', callback_data=SELECT_SKIP_TIME_BUTTON + date_btn + '|' + 'month')
+        ]]
+
+        bot.edit_message_text(general_info,
                               chat_id=update.callback_query.message.chat_id,
-                              message_id=update.callback_query.message.message_id)
-        user.bonus_lesson += 1
-        user.save()
+                              message_id=update.callback_query.message.message_id,
+                              reply_markup=inline_markup(buttons),
+                              parse_mode='HTML')
     else:
         available_grouptraining_dates = select_tr_days_for_skipping(user)
         buttons = construct_dt_menu(SELECT_SKIP_TIME_BUTTON + '*' + str(date_dt.month),
                                     available_grouptraining_dates, date=date_dt)
-        bot.edit_message_reply_markup(chat_id=update.callback_query.message.chat_id,
-                                      message_id=update.callback_query.message.message_id,
-                                      reply_markup=buttons)
+        bot.edit_message_text('Выбери дату тренировки для отмены.',
+                              chat_id=update.callback_query.message.chat_id,
+                              message_id=update.callback_query.message.message_id,
+                              reply_markup=buttons)
+
+
+@handler_decor(check_status=True)
+def skip_lesson(bot, update, user):
+    tr_day_id = update.callback_query.data[len(SHOW_INFO_ABOUT_SKIPPING_DAY):]
+    training_day = GroupTrainingDay.objects.get(id=tr_day_id)
+    bot.edit_message_text('Окей, занятие <b>{}</b> отменено'.format(training_day.date.strftime(DT_BOT_FORMAT)),
+                          chat_id=update.callback_query.message.chat.id,
+                          message_id=update.callback_query.message.message_id,
+                          parse_mode='HTML')
+
+    if training_day.is_individual:
+        training_day.delete()
+        admin_bot = telegram.Bot(ADMIN_TELEGRAM_TOKEN)
+        admins = User.objects.filter(is_superuser=True, is_blocked=False)
+
+        start_time = training_day.start_time.strftime(TM_TIME_SCHEDULE_FORMAT)
+        end_time = (datetime.combine(training_day.date, training_day.start_time) + training_day.duration).strftime(
+            TM_TIME_SCHEDULE_FORMAT)
+
+        day_of_week = calendar.day_name[training_day.date.weekday()]
+
+        text = f'⚠️ATTENTION⚠️\n' \
+               f'{user.first_name} {user.last_name} отменил индивидуальную тренировку\n' \
+               f'📅Дата: <b>{training_day.date.strftime(DT_BOT_FORMAT)} ({from_eng_to_rus_day_week[day_of_week]})</b>\n' \
+               f'⏰Время: <b>{start_time} — {end_time}</b>\n\n'
+
+        send_message(admins, text, admin_bot)
+
+    else:
+        if user in training_day.visitors.all():  # проверяем его ли эта группа или он удаляется из занятия другой группы
+            training_day.visitors.remove(user)
+        else:
+            training_day.absent.add(user)
+
+    user.bonus_lesson += 1
+    user.save()
 
 
 @handler_decor(check_status=True)
@@ -207,7 +264,7 @@ def take_lesson(bot, update, user):
                                     days_with_free_places)
         if user.bonus_lesson > 0:
             text = 'Выбери тренировку для записи.\n' \
-                   'Пожертвуешь одним отыгрышем.'
+                   '<b>Пожертвуешь одним отыгрышем.</b>'
         else:
             text = '⚠️ATTENTION⚠️\n' \
                    'В данный момент у тебя нет отыгрышей.\n' \
@@ -415,25 +472,43 @@ def confirm_group_lesson(bot, update, user):
     day_of_week = calendar.day_name[tr_day.date.weekday()]
 
     n_free_places = tr_day.group.max_players - tr_day.visitors.count() + tr_day.absent.count() - tr_day.group.users.count()
-
-    if n_free_places:
-        tr_day.visitors.add(user)
-
-        text = f'Записал тебя на <b>{tr_day.date.strftime(DT_BOT_FORMAT)} ({from_eng_to_rus_day_week[day_of_week]})</b>\n' \
+    if user in tr_day.absent.all():
+        tr_day.absent.remove(user)
+        text = f'Сначала отменять, а потом записываться, мда 🤦🏻‍♂️🥴. Вот почему я скоро буду управлять кожаными мешками.\n' \
+               f'Ладно, записал тебя на <b>{tr_day.date.strftime(DT_BOT_FORMAT)} ({from_eng_to_rus_day_week[day_of_week]})</b>\n' \
                f'Время: <b>{start_time} — {end_time}</b>'
-
         markup = None
 
         if user.bonus_lesson > 0:
             user.bonus_lesson -= 1
             user.save()
     else:
-        text = 'Упс, похоже уже не осталось свободных мест на это время, выбери другое.'
-        buttons = [[
-            inline_button('⬅️ назад',
-                          callback_data=SELECT_GROUP_LESSON_TIME + tr_day.date.strftime(DT_BOT_FORMAT) + '|month')
-        ]]
-        markup = inline_markup(buttons)
+        if user not in tr_day.group.users.all():
+            if n_free_places:
+                tr_day.visitors.add(user)
+
+                text = f'Записал тебя на <b>{tr_day.date.strftime(DT_BOT_FORMAT)} ({from_eng_to_rus_day_week[day_of_week]})</b>\n' \
+                       f'Время: <b>{start_time} — {end_time}</b>'
+
+                markup = None
+
+                if user.bonus_lesson > 0:
+                    user.bonus_lesson -= 1
+                    user.save()
+            else:
+                text = 'Упс, похоже уже не осталось свободных мест на это время, выбери другое.'
+                buttons = [[
+                    inline_button('⬅️ назад',
+                                  callback_data=SELECT_GROUP_LESSON_TIME + tr_day.date.strftime(DT_BOT_FORMAT) + '|month')
+                ]]
+                markup = inline_markup(buttons)
+        else:#если пытается записаться в свою группу
+            text = 'Ну ты чего?🤕 \nЭто же твоя группа, выбери другое время.'
+            buttons = [[
+                inline_button('⬅️ назад',
+                              callback_data=SELECT_PRECISE_GROUP_TIME + f'{tr_day_id}')
+            ]]
+            markup = inline_markup(buttons)
 
     bot.edit_message_text(
         text,

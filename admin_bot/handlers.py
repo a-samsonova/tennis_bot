@@ -124,7 +124,7 @@ def show_traingroupday_info(bot, update, user):
 
     group_name = f"{tr_day.group.name}\n"
 
-    if tr_day.group.max_players > 1:
+    if not tr_day.is_individual:
         group_players = f'Игроки группы:\n{info_about_users(tr_day.group.users)}\n'
         visitors = f'\n➕Пришли из других:\n{info_about_users(tr_day.visitors)}\n' if tr_day.visitors.count() else ''
         absents = f'\n➖Отсутствуют:\n{info_about_users(tr_day.absent)}\n' if tr_day.absent.count() else ''

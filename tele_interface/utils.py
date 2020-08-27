@@ -163,7 +163,8 @@ def get_potential_days_for_group_training(user):
                                output_field=DurationField())).filter(
                                                                     max_players__gt=F('n_visitors') + F('n_players') - F('n_absent'),
                                                                     diff__gte=timedelta(hours=1),
-                                                                    is_individual=False).exclude(
-                                                                            Q(visitors__in=[user]) | Q(group__users__in=[user])).order_by('start_time')
+                                                                    is_individual=False,
+                                                                    ).exclude(
+                                                                            visitors__in=[user]).order_by('start_time')
 
     return potential_free_places

@@ -12,7 +12,11 @@ from tele_interface.manage_data import (
     SELECT_IND_LESSON_TIME,
     SELECT_TRAINING_TYPE,
     SELECT_SKIP_TIME_BUTTON,
-    ADMIN_TIME_SCHEDULE_BUTTON, SELECT_DAY_TO_SHOW_COACH_SCHEDULE, )
+    ADMIN_TIME_SCHEDULE_BUTTON,
+    SELECT_DAY_TO_SHOW_COACH_SCHEDULE,
+    MY_DATA,
+    SKIP_LESSON,
+    TAKE_LESSON, )
 
 DTTM_BOT_FORMAT = '%Y.%m.%d.%H.%M'
 DT_BOT_FORMAT = '%Y.%m.%d'
@@ -49,8 +53,8 @@ def send_message(users, message: str, bot, markup=None):
 
 def construct_main_menu():
     return ReplyKeyboardMarkup([
-        ['Мои данные'],
-        ['Пропустить занятие', 'Записаться на занятие']],
+        [MY_DATA],
+        [SKIP_LESSON, TAKE_LESSON]],
         resize_keyboard=True)
 
 
@@ -118,7 +122,7 @@ def construct_dt_menu(button_text, dates, date=None):
             inlinebutt(from_digit_to_month[date.month], callback_data='None')
         ])
     back_data = SELECT_TRAINING_TYPE + 'ind' if re.findall(r'^{}'.format(SELECT_IND_LESSON_TIME),
-                                                           button_info) else 'Записаться на занятие'
+                                                           button_info) else TAKE_LESSON
     if not re.findall(r'^{}'.format(SELECT_SKIP_TIME_BUTTON), button_info) and not re.findall(r'^{}'.format(SELECT_DAY_TO_SHOW_COACH_SCHEDULE), button_info):
         buttons.append([
             inlinebutt('⬅️ назад',
