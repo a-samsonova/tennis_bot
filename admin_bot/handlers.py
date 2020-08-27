@@ -104,13 +104,18 @@ def choose_dt_for_coach_time_schedule(bot, update, user):
                               reply_markup=buttons)
 
 
-def info_about_users(users):
+def info_about_users(users, for_admin=False):
     """
+    :param for_admin: show info for admin or not (number instead of smile)
     :param users: User instance
     :return: (first_name + last_name + \n){1,} -- str
     """
-    return '\n'.join(
-            ('👤' + x['first_name'] + ' ' + x['last_name'] for x in users.values('first_name', 'last_name')))
+    if for_admin:
+        return '\n'.join(
+            (f"{i + 1}. {x['first_name']} {x['last_name']}" for i, x in enumerate(users.values('first_name', 'last_name'))))
+    else:
+        return '\n'.join(
+                (f"👤{x['first_name']} {x['last_name']}" for x in enumerate(users.values('first_name', 'last_name'))))
 
 
 @admin_handler_decor()
@@ -125,9 +130,9 @@ def show_traingroupday_info(bot, update, user):
     group_name = f"{tr_day.group.name}\n"
 
     if not tr_day.is_individual:
-        group_players = f'Игроки группы:\n{info_about_users(tr_day.group.users)}\n'
-        visitors = f'\n➕Пришли из других:\n{info_about_users(tr_day.visitors)}\n' if tr_day.visitors.count() else ''
-        absents = f'\n➖Отсутствуют:\n{info_about_users(tr_day.absent)}\n' if tr_day.absent.count() else ''
+        group_players = f'Игроки группы:\n{info_about_users(tr_day.group.users.all().difference(tr_day.absent.all()), for_admin=True)}\n'
+        visitors = f'\n➕Пришли из других:\n{info_about_users(tr_day.visitors, for_admin=True)}\n' if tr_day.visitors.count() else ''
+        absents = f'\n➖Отсутствуют:\n{info_about_users(tr_day.absent, for_admin=True)}\n' if tr_day.absent.count() else ''
     else:
         group_players = ''
         visitors = ''
