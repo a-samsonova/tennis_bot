@@ -38,12 +38,12 @@ def send_message(users, message: str, bot, markup=None):
     :param markup: telegram markup
     :return: send message to users in telegram bot
     """
-    reply_markup = markup if markup else construct_main_menu()
+
     for user in users:
         try:
             bot.send_message(user.id,
                              message,
-                             reply_markup=reply_markup,
+                             reply_markup=markup,
                              parse_mode='HTML')
         except (telegram.error.Unauthorized, telegram.error.BadRequest):
             user.is_blocked = True
@@ -190,4 +190,4 @@ def send_alert_about_changing_tr_day_status(tr_day, new_is_available: bool, bot)
         text = 'Тренировка <b>{} в {}</b> доступна, ура!'.format(tr_day.date,
                                                                  tr_day.start_time)
 
-    send_message(group_members.union(visitors), text, bot)
+    send_message(group_members.union(visitors), text, bot, construct_main_menu())

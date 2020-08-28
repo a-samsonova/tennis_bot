@@ -82,7 +82,7 @@ class UserForm(forms.ModelForm):
             new_status = self.cleaned_data.get('status')
             if self.instance.status == User.STATUS_WAITING and (new_status == User.STATUS_ARBITRARY or new_status == User.STATUS_TRAINING):
                 bot = telegram.Bot(TELEGRAM_TOKEN)
-                send_message([self.instance], 'Теперь тебе доступен мой функционал, поздравляю!', bot)
+                send_message([self.instance], 'Теперь тебе доступен мой функционал, поздравляю!', bot, markup=construct_main_menu())
 
 
 class TrainingGroup(ModelwithTime):
