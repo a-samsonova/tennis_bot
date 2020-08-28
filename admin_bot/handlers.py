@@ -115,7 +115,7 @@ def info_about_users(users, for_admin=False):
             (f"{i + 1}. {x['first_name']} {x['last_name']}" for i, x in enumerate(users.values('first_name', 'last_name'))))
     else:
         return '\n'.join(
-                (f"👤{x['first_name']} {x['last_name']}" for x in enumerate(users.values('first_name', 'last_name'))))
+                (f"👤{x['first_name']} {x['last_name']}" for i, x in enumerate(users.values('first_name', 'last_name'))))
 
 
 @admin_handler_decor()
