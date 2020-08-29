@@ -154,14 +154,14 @@ def select_tr_days_for_skipping(user):
 
 
 def get_potential_days_for_group_training(user):
-    potential_free_places = GroupTrainingDay.objects.tr_day_is_my_available().annotate(
-        n_absent=Count('absent'),
+    potential_free_places = GroupTrainingDay.objects.annotate(
+        Count('absent', distinct=True),
+        Count('group__users', distinct=True),
+        Count('visitors', distinct=True),
         max_players=F('group__max_players'),
-        n_players=Count('group__users'),
-        n_visitors=Count('visitors'),
         diff=ExpressionWrapper(F('start_time') + F('date') - datetime.now() - timedelta(hours=3),
                                output_field=DurationField())).filter(
-                                                                    max_players__gt=F('n_visitors') + F('n_players') - F('n_absent'),
+                                                                    max_players__gt=F('visitors__count') + F('group__users__count') - F('absent__count'),
                                                                     diff__gte=timedelta(hours=1),
                                                                     is_individual=False,
                                                                     ).exclude(
