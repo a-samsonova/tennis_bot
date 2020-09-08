@@ -56,9 +56,12 @@ class User(AbstractUser):
     )
 
     tarif_for_status = {
-        STATUS_TRAINING: StaticData.objects.first().tarif_group,
-        STATUS_ARBITRARY: StaticData.objects.first().tarif_arbitrary,
-        STATUS_IND_TRAIN: StaticData.objects.first().tarif_ind,
+        # STATUS_TRAINING: StaticData.objects.first().tarif_group,
+        # STATUS_ARBITRARY: StaticData.objects.first().tarif_arbitrary,
+        # STATUS_IND_TRAIN: StaticData.objects.first().tarif_ind,
+        STATUS_TRAINING: 400,
+        STATUS_ARBITRARY: 600,
+        STATUS_IND_TRAIN: 1400,
     }
 
     id = models.BigIntegerField(primary_key=True)  # telegram id
@@ -269,13 +272,14 @@ class Payment(models.Model):
         payment = 0
         for x in self.player.traininggroup_set.all():
             if x.status == TrainingGroup.STATUS_SECTION:
-                payment = StaticData.objects.first().tarif_section
+                # payment = StaticData.objects.first().tarif_section
+                payment = 4000
         if not payment:
             payment = base_query.annotate(
                 gr_status=F('group__status')).annotate(
-                tarif=Case(When(gr_status=TrainingGroup.STATUS_4IND, then=StaticData.objects.first().tarif_ind),
-                           When(gr_status=TrainingGroup.STATUS_GROUP, then=StaticData.objects.first().tarif_group),
-                           When(gr_status=TrainingGroup.STATUS_FEW, then=StaticData.objects.first().tarif_few),
+                tarif=Case(When(gr_status=TrainingGroup.STATUS_4IND, then=1400),
+                           When(gr_status=TrainingGroup.STATUS_GROUP, then=400),
+                           When(gr_status=TrainingGroup.STATUS_FEW, then=400),
                            output_field=IntegerField())).distinct().aggregate(
                 sigma=Sum('tarif'))['sigma']
 
