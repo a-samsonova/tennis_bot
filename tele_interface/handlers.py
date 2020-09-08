@@ -1,7 +1,7 @@
 from admin_bot.handlers import info_about_users
 from .utils import (handler_decor,
                     get_available_dt_time4ind_train, select_tr_days_for_skipping,
-                    get_potential_days_for_group_training, )
+                    get_potential_days_for_group_training,)
 from base.utils import (construct_main_menu,
                         construct_dt_menu,
                         construct_time_menu_for_group_lesson,
@@ -110,25 +110,41 @@ def user_main_info(bot, update, user):
 
     teammates = group.users.values('first_name', 'last_name') if group else []
 
-    group_info = "Твоя группа:\n{}\n\n".format(
-        '\n'.join([' ' + x['first_name'] + ' ' + x['last_name'] for x in teammates])) if teammates else ''
+    group_info = "Твоя группа -- {}:\n{}\n\n".format(group.name, info_about_users(teammates)) if teammates else ''
 
     number_of_add_games = 'Количество отыгрышей: <b>{}</b>\n\n'.format(user.bonus_lesson)
 
     today = date.today()
+    first_day = today - timedelta(days=today.day - 1)
     number_of_days_in_month = monthrange(today.year, today.month)[1]
     last_day = date(today.year, today.month, number_of_days_in_month)
     next_month = last_day + timedelta(days=1)
     number_of_days_in_next_month = monthrange(next_month.year, next_month.month)[1]
     last_day_in_next_month = date(next_month.year, next_month.month, number_of_days_in_next_month)
 
-    tr_days_num = GroupTrainingDay.objects.filter(Q(group__users__in=[user]) | Q(visitors__in=[user]),
-                                                  is_available=True,
-                                                  date__gte=next_month,
-                                                  date__lte=last_day_in_next_month).count()
-    should_pay_money = tr_days_num * User.tarif_for_status[user.status]
-    should_pay_info = 'В следующем месяце ({}) <b>нужно заплатить {} ₽</b>.'.format(
-        from_digit_to_month[next_month.month], should_pay_money)
+    tr_days_this_month = GroupTrainingDay.objects.filter(date__gte=first_day, date__lte=last_day, is_available=True)
+    tr_days_next_month = GroupTrainingDay.objects.filter(date__gte=next_month, date__lte=last_day_in_next_month, is_available=True)
+
+    if user.status == User.STATUS_TRAINING:
+        tr_days_num_this_month = tr_days_this_month.filter(group__users__in=[user],
+                                                           group__status=TrainingGroup.STATUS_GROUP)
+        tr_days_num_next_month = tr_days_next_month.filter(group__users__in=[user],
+                                                           group__status=TrainingGroup.STATUS_GROUP)
+
+    elif user.status == User.STATUS_ARBITRARY:
+        tr_days_num_this_month = tr_days_this_month.filter(visitors__in=[user])
+        tr_days_num_next_month = tr_days_next_month.filter(visitors__in=[user])
+
+    balls_this_month = tr_days_this_month.filter(Q(visitors__in=[user]) | Q(group__users__in=[user])).count()
+
+    balls_next_month = tr_days_num_next_month.filter(Q(visitors__in=[user]) | Q(group__users__in=[user])).count()
+
+    should_pay_money_next = tr_days_num_next_month.count() * User.tarif_for_status[user.status]
+    should_pay_this_month = tr_days_num_this_month.count() * User.tarif_for_status[user.status]
+    should_pay_info = 'В этом месяце ({}) <b>нужно заплатить {} ₽ + {} ₽ за мячи.</b>\n' \
+                      'В следующем месяце ({}) <b>нужно заплатить {} ₽ + {} ₽ за мячи</b>.'.format(
+        from_digit_to_month[today.month], should_pay_this_month, 100*round(balls_this_month/4),
+        from_digit_to_month[next_month.month], should_pay_money_next, 100*round(balls_next_month/4))
 
     text = intro + group_info + number_of_add_games + should_pay_info
 
@@ -438,8 +454,10 @@ def select_precise_group_lesson_time(bot, update, user):
     all_players = tr_day.group.users.union(tr_day.visitors.all()).difference(tr_day.absent.all()).values('first_name',
                                                                                                          'last_name')
 
+    group_level = {TrainingGroup.LEVEL_ORANGE: '🟠мяч🟠', TrainingGroup.LEVEL_GREEN: '🟢мяч🟢'}
+
     all_players = '\n'.join((f"{x['first_name']} {x['last_name']}" for x in all_players))
-    text = f'{tr_day.group.name}\n' \
+    text = f'{tr_day.group.name} -- {group_level[tr_day.group.level]}\n' \
            f'📅Дата: <b>{tr_day.date.strftime(DT_BOT_FORMAT)} ({from_eng_to_rus_day_week[day_of_week]})</b>\n' \
            f'⏰Время: <b>{start_time} — {end_time}</b>\n\n' \
            f'👥Присутствующие:\n{all_players}\n\n' \

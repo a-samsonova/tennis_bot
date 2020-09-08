@@ -2,8 +2,9 @@ from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.core.exceptions import ValidationError
 from django import forms
+from django.db.models import Q, F, Case, When, Sum, IntegerField
 from django.utils import timezone
-from datetime import timedelta, datetime
+from datetime import timedelta, datetime, date
 from base.utils import construct_main_menu, send_message
 from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
@@ -29,6 +30,18 @@ class ModelwithTime(models.Model):
         abstract = True
 
 
+class StaticData(models.Model):
+    tarif_ind = models.PositiveIntegerField(null=True, default=1400, verbose_name='Индивидуальный тариф')
+    tarif_group = models.PositiveIntegerField(null=True, default=400, verbose_name='Групповой взрослый тариф')
+    tarif_arbitrary = models.PositiveIntegerField(null=True, default=600, verbose_name='Тариф для свободного графика')
+    tarif_few = models.PositiveIntegerField(null=True, default=400, verbose_name='Тариф для детской группы малой численности')
+    tarif_section = models.PositiveIntegerField(null=True, default=4000, verbose_name='Тариф для детской секции в месяц')
+
+    class Meta:
+        verbose_name = 'Изменяемые данные'
+        verbose_name_plural = 'Изменяемые данные'
+
+
 class User(AbstractUser):
     STATUS_WAITING = 'W'
     STATUS_TRAINING = 'G'
@@ -43,15 +56,17 @@ class User(AbstractUser):
     )
 
     tarif_for_status = {
-        STATUS_TRAINING: 400,
-        STATUS_ARBITRARY: 600,
-        STATUS_IND_TRAIN: 1400,
+        STATUS_TRAINING: StaticData.objects.first().tarif_group,
+        STATUS_ARBITRARY: StaticData.objects.first().tarif_arbitrary,
+        STATUS_IND_TRAIN: StaticData.objects.first().tarif_ind,
     }
 
     id = models.BigIntegerField(primary_key=True)  # telegram id
     telegram_username = models.CharField(max_length=64, null=True, blank=True)
     first_name = models.CharField(max_length=32, null=True, verbose_name='Имя')
     phone_number = models.CharField(max_length=16, null=True, verbose_name='Номер телефона')
+    parent = models.ForeignKey('self', on_delete=models.PROTECT, blank=True, null=True, verbose_name='Родитель',
+                               related_name='children')
 
     is_superuser = models.BooleanField(default=False)
     is_blocked = models.BooleanField(default=False)
@@ -74,8 +89,8 @@ class User(AbstractUser):
 class UserForm(forms.ModelForm):
     class Meta:
         model = User
-        fields = ['id', 'first_name', 'last_name', 'phone_number', 'status', 'time_before_cancel', 'bonus_lesson',
-                  'add_info']
+        fields = ['id', 'first_name', 'last_name', 'phone_number', 'parent', 'status', 'time_before_cancel',
+                  'bonus_lesson', 'add_info']
 
     def clean(self):
         if 'status' in self.changed_data:
@@ -86,9 +101,29 @@ class UserForm(forms.ModelForm):
 
 
 class TrainingGroup(ModelwithTime):
-    name = models.CharField(max_length=32, verbose_name='имя')
+    STATUS_4IND = 'I'
+    STATUS_GROUP = 'G'
+    STATUS_FEW = 'F'
+    STATUS_SECTION = 'S'
+    GROUP_STATUSES = (
+        (STATUS_4IND, 'для индивидуальных тренировок'),
+        (STATUS_GROUP, 'взрослые групповые тренировки'),
+        (STATUS_FEW, 'детская группа малой численности'),
+        (STATUS_SECTION, 'детская секция'),
+    )
+
+    LEVEL_ORANGE = 'O'
+    LEVEL_GREEN = 'G'
+    GROUP_LEVELS = (
+        (LEVEL_GREEN, '🍏мяч🍏'),
+        (LEVEL_ORANGE, '🧡мяч🧡'),
+    )
+
+    name = models.CharField(max_length=32, verbose_name='Название')
     users = models.ManyToManyField(User)
     max_players = models.SmallIntegerField(default=6, verbose_name='Максимальное количество игроков в группе')
+    status = models.CharField(max_length=1, choices=GROUP_STATUSES, verbose_name='Статус группы', default=STATUS_GROUP)
+    level = models.CharField(max_length=1, choices=GROUP_LEVELS, verbose_name='Уровень группы', default=LEVEL_ORANGE)
 
     class Meta:
         verbose_name = 'банда'
@@ -101,7 +136,7 @@ class TrainingGroup(ModelwithTime):
 class TrainingGroupForm(forms.ModelForm):
     class Meta:
         model = TrainingGroup
-        fields = ['name', 'users', 'max_players']
+        fields = ['name', 'users', 'max_players', 'status', 'level']
 
     def clean(self):
         users = self.cleaned_data.get('users')
@@ -189,13 +224,6 @@ class GroupTrainingDayForm(forms.ModelForm):
                     player.save()
 
 
-class Channel(models.Model):
-    name = models.CharField(max_length=64, default='')
-    username = models.CharField(max_length=64, default='')
-    code = models.CharField(max_length=32, default='')
-    token = models.CharField(max_length=256, default='')
-
-
 class Payment(models.Model):
     JANUARY, FEBRUARY, MARCH, APRIL, MAY, JUNE, JULY, AUGUST, SEPTEMBER = '1', '2', '3', '4', '5', '6', '7', '8', '9'
     OCTOBER, NOVEMBER, DECEMBER = '10', '11', '12'
@@ -216,15 +244,54 @@ class Payment(models.Model):
     player = models.ForeignKey(User, on_delete=models.SET_NULL, verbose_name='игрок', null=True)
     month = models.CharField(max_length=2, choices=MONTHS, verbose_name='месяц')
     year = models.CharField(max_length=1, choices=YEARS, verbose_name='год')
-    amount = models.PositiveIntegerField(verbose_name='Сколько заплатил')
+    fact_amount = models.PositiveIntegerField(verbose_name='Сколько заплатил', null=True, default=0)
+    theory_amount = models.PositiveIntegerField(verbose_name='Сколько должен был заплатить', null=True, default=0)
+    n_fact_visiting = models.PositiveSmallIntegerField(verbose_name='Кол-во посещенных занятий', null=True, default=0)
 
     class Meta:
         ordering = ['year']
         verbose_name = 'оплата'
         verbose_name_plural = 'оплата'
 
+    def save(self, *args, **kwargs):
+        year = int(self.year) + 2020
+        month = int(self.month)
+        begin_day_month = date(year, month, 1)
+
+        base_query = GroupTrainingDay.objects.filter(Q(visitors__in=[self.player]) | Q(group__users__in=[self.player]),
+                                                     date__gte=begin_day_month,
+                                                     date__lte=date.today(),
+                                                     is_available=True,
+                                                     date__month=month).exclude(absent__in=[self.player])
+
+        self.n_fact_visiting = base_query.distinct().count()
+
+        payment = 0
+        for x in self.player.traininggroup_set.all():
+            if x.status == TrainingGroup.STATUS_SECTION:
+                payment = StaticData.objects.first().tarif_section
+        if not payment:
+            payment = base_query.annotate(
+                gr_status=F('group__status')).annotate(
+                tarif=Case(When(gr_status=TrainingGroup.STATUS_4IND, then=StaticData.objects.first().tarif_ind),
+                           When(gr_status=TrainingGroup.STATUS_GROUP, then=StaticData.objects.first().tarif_group),
+                           When(gr_status=TrainingGroup.STATUS_FEW, then=StaticData.objects.first().tarif_few),
+                           output_field=IntegerField())).distinct().aggregate(
+                sigma=Sum('tarif'))['sigma']
+
+        self.theory_amount = payment
+
+        super(Payment, self).save(*args, **kwargs)
+
     def __str__(self):
-        return f"{self.player}, месяц: {self.month}, рублей: {self.amount}"
+        return f"{self.player}, месяц: {self.month}"
+
+
+class Channel(models.Model):
+    name = models.CharField(max_length=64, default='')
+    username = models.CharField(max_length=64, default='')
+    code = models.CharField(max_length=32, default='')
+    token = models.CharField(max_length=256, default='')
 
 
 """раздел с сигналами, в отедльном файле что-то не пошло"""
