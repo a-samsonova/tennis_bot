@@ -8,7 +8,7 @@ import django.db.models.deletion
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('base', '0017_grouptrainingday_is_individual'),
+        ('base', '0025_insert_static_data'),
     ]
 
     operations = [
