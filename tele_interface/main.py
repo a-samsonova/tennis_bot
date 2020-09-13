@@ -25,6 +25,7 @@ from tele_interface.handlers import (
     select_precise_ind_lesson_time,
     confirm_group_lesson,
     skip_lesson,
+    get_help
 )
 from tele_interface.manage_data import (
     SELECT_SKIP_TIME_BUTTON,
@@ -38,7 +39,7 @@ from tele_interface.manage_data import (
     SHOW_INFO_ABOUT_SKIPPING_DAY,
     SKIP_LESSON_BUTTON,
     TAKE_LESSON_BUTTON,
-    MY_DATA_BUTTON,
+    MY_DATA_BUTTON, HELP_BUTTON,
 )
 from tennis_bot.config import TELEGRAM_TOKEN
 
@@ -51,6 +52,7 @@ def add_handlers(updater):
     dp.add_handler(RegexHandler(SKIP_LESSON_BUTTON, skip_lesson_main_menu_button))
     dp.add_handler(RegexHandler(TAKE_LESSON_BUTTON, choose_type_of_training))
     dp.add_handler(RegexHandler(MY_DATA_BUTTON, user_main_info))
+    dp.add_handler(RegexHandler(HELP_BUTTON, get_help))
 
     dp.add_handler(RegexHandler(r'^\w+\s\w+$', get_personal_data))
     dp.add_handler(RegexHandler(r'^\d+$', get_personal_data))

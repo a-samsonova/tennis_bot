@@ -51,6 +51,13 @@ def update_user_info(update, user):
 @handler_decor()
 def start(bot, update, user):
     update_user_info(update, user)
+    bot.send_message(user.id, 'Я здесь', reply_markup=construct_main_menu())
+
+
+@handler_decor()
+def get_help(bot, update, user):
+    bot.send_message(user.id, 'По всем вопросам пиши @ta2asho.\n'
+                              'Желательно описывать свою проблему со скриншотами.', reply_markup=construct_main_menu())
 
 
 @handler_decor()
@@ -165,7 +172,8 @@ def skip_lesson_main_menu_button(bot, update, user):
                          reply_markup=buttons)
     else:
         bot.send_message(user.id,
-                         'Пока что нечего пропускать.')
+                         'Пока что нечего пропускать.',
+                         reply_markup=construct_main_menu())
 
 
 @handler_decor()
@@ -328,7 +336,6 @@ def select_dt_for_ind_lesson(bot, update, user):
                               message_id=update.callback_query.message.message_id,)
     else:
         bot.edit_message_text('В данный момент нет доступных дней для записи.',
-                              reply_markup=None,
                               chat_id=update.callback_query.message.chat_id,
                               message_id=update.callback_query.message.message_id,
                               )

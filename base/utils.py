@@ -16,7 +16,7 @@ from tele_interface.manage_data import (
     SELECT_DAY_TO_SHOW_COACH_SCHEDULE,
     MY_DATA_BUTTON,
     SKIP_LESSON_BUTTON,
-    TAKE_LESSON_BUTTON, )
+    TAKE_LESSON_BUTTON, HELP_BUTTON, )
 
 DTTM_BOT_FORMAT = '%Y.%m.%d.%H.%M'
 DT_BOT_FORMAT = '%Y.%m.%d'
@@ -53,7 +53,7 @@ def send_message(users, message: str, bot, markup=None):
 
 def construct_main_menu():
     return ReplyKeyboardMarkup([
-        [MY_DATA_BUTTON],
+        [MY_DATA_BUTTON, HELP_BUTTON],
         [SKIP_LESSON_BUTTON, TAKE_LESSON_BUTTON]],
         resize_keyboard=True)
 

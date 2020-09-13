@@ -218,7 +218,7 @@ class GroupTrainingDayForm(forms.ModelForm):
                 text = f'😱ATTENTION😱\n' \
                        f'У тебя есть запись на тренировку на <b> {self.cleaned_data.get("date")}.</b>\n' \
                        f'<b>Тренер ее отменил.</b> Но не отчаивайся, я добавлю тебе отыгрыш 🎾'
-                send_message(canceled_users, text, bot)
+                send_message(canceled_users, text, bot, markup=construct_main_menu())
                 for player in canceled_users:
                     player.bonus_lesson += 1
                     player.save()

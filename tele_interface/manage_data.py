@@ -6,6 +6,7 @@ ADMIN_TIME_SCHEDULE_BUTTON = 'Расписание'
 TAKE_LESSON_BUTTON = 'Записаться на занятие'
 MY_DATA_BUTTON = 'Мои данные'
 SKIP_LESSON_BUTTON = 'Пропустить занятие'
+HELP_BUTTON = '🤓Поддержка'
 
 SELECT_DAY_TO_SHOW_COACH_SCHEDULE = 'COACH_SCHEDULE'
 SHOW_GROUPDAY_INFO = 'GROUPDAY_INFO'
