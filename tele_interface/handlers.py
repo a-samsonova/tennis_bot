@@ -461,7 +461,7 @@ def select_precise_group_lesson_time(bot, update, user):
     all_players = tr_day.group.users.union(tr_day.visitors.all()).difference(tr_day.absent.all()).values('first_name',
                                                                                                          'last_name')
 
-    group_level = {TrainingGroup.LEVEL_ORANGE: '🟠мяч🟠', TrainingGroup.LEVEL_GREEN: '🟢мяч🟢'}
+    group_level = {TrainingGroup.LEVEL_ORANGE: '🟠оранжевый мяч🟠', TrainingGroup.LEVEL_GREEN: '🟢зелёный мяч🟢'}
 
     all_players = '\n'.join((f"{x['first_name']} {x['last_name']}" for x in all_players))
     text = f'{tr_day.group.name} -- {group_level[tr_day.group.level]}\n' \
