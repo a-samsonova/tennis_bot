@@ -115,8 +115,8 @@ class TrainingGroup(ModelwithTime):
     LEVEL_ORANGE = 'O'
     LEVEL_GREEN = 'G'
     GROUP_LEVELS = (
-        (LEVEL_GREEN, '🍏мяч🍏'),
-        (LEVEL_ORANGE, '🧡мяч🧡'),
+        (LEVEL_GREEN, '🍏зелёный мяч🍏'),
+        (LEVEL_ORANGE, '🧡оранжевый мяч🧡'),
     )
 
     name = models.CharField(max_length=32, verbose_name='Название')
