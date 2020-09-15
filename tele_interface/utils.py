@@ -9,7 +9,8 @@ from django.db.models import (ExpressionWrapper,
 from django.db.models.functions import TruncDate
 
 from base.models import (User,
-                         GroupTrainingDay, )
+                         GroupTrainingDay,
+                         TrainingGroup,)
 from tennis_bot.settings import DEBUG
 import telegram
 import sys
@@ -163,7 +164,7 @@ def get_potential_days_for_group_training(user):
                                output_field=DurationField())).filter(
                                                                     max_players__gt=F('visitors__count') + F('group__users__count') - F('absent__count'),
                                                                     diff__gte=timedelta(hours=1),
-                                                                    is_individual=False,
+                                                                    group__status=TrainingGroup.STATUS_GROUP,
                                                                     ).exclude(
                                                                             visitors__in=[user]).order_by('start_time')
 
