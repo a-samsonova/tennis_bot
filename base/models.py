@@ -304,10 +304,11 @@ def create_training_days_for_next_two_months(sender, instance, created, **kwargs
     еще таких же записей примерно на 2 месяца вперед.
     Используем bulk_create, т.к. иначе получим рекурсию.
     """
-    if created and instance.group.max_players > 1:
+    if created:
+        period = 8 if instance.group.status == TrainingGroup.STATUS_4IND else 24
         date = instance.date + timedelta(days=7)
         dates = [date]
-        for _ in range(24):
+        for _ in range(period):
             date += timedelta(days=7)
             dates.append(date)
         objs = [GroupTrainingDay(group=instance.group, date=dat, start_time=instance.start_time,
