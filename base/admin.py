@@ -1,10 +1,14 @@
 from django.contrib import admin
+from datetime import date
 # Register your models here.
+from django.utils.http import urlencode
+
 from .models import *
 from django.utils.translation import ugettext_lazy as _
 from django.contrib.admin import SimpleListFilter
 from django.core.exceptions import ValidationError
 from django import forms
+from django.shortcuts import redirect
 
 bot = telegram.Bot(TELEGRAM_TOKEN)
 
@@ -123,6 +127,18 @@ class GroupTrainingDayAdmin(admin.ModelAdmin):
         if db_field.name == 'visitors' and hasattr(request, 'report_obj'):
             kwargs['queryset'] = User.objects.exclude(traininggroup__id=request.report_obj.group.id)
         return super(GroupTrainingDayAdmin, self).formfield_for_manytomany(db_field, request, **kwargs)
+
+    def changelist_view(self, request, extra_context=None):
+        if request.GET:
+            return super().changelist_view(request, extra_context=extra_context)
+
+        today_date = date.today()
+        params = ['month', 'year']
+        field_keys = ['{}__{}'.format(self.date_hierarchy, i) for i in params]
+        field_values = [getattr(today_date, i) for i in params]
+        query_params = dict(zip(field_keys, field_values))
+        url = '{}?{}'.format(request.path, urlencode(query_params))
+        return redirect(url)
 
 
 @admin.register(Payment)
