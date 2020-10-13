@@ -1,12 +1,14 @@
 import calendar
 
 from base.models import User, GroupTrainingDay
-from base.utils import DT_BOT_FORMAT, TM_TIME_SCHEDULE_FORMAT, construct_admin_main_menu, construct_dt_menu
-from tele_interface.manage_data import PERMISSION_FOR_IND_TRAIN, SELECT_DAY_TO_SHOW_COACH_SCHEDULE, SHOW_GROUPDAY_INFO, \
-    from_eng_to_rus_day_week
+from base.utils import construct_admin_main_menu, DT_BOT_FORMAT, TM_TIME_SCHEDULE_FORMAT
+from tele_interface.manage_data import PERMISSION_FOR_IND_TRAIN, SHOW_GROUPDAY_INFO, \
+    from_eng_to_rus_day_week, CLNDR_ADMIN_VIEW_SCHEDULE, CLNDR_ACTION_BACK, CLNDR_NEXT_MONTH, CLNDR_DAY, CLNDR_IGNORE, \
+    CLNDR_PREV_MONTH
+from tele_interface.utils import create_calendar, separate_callback_data, create_callback_data
 from .utils import admin_handler_decor, day_buttons_coach_info
 from tennis_bot.config import TELEGRAM_TOKEN
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from telegram import (InlineKeyboardButton as inlinebutt,
                       InlineKeyboardMarkup as inlinemark,)
 
@@ -71,37 +73,82 @@ def permission_for_ind_train(bot, update, user):
     )
 
 
+def admin_calendar_selection(bot, update):
+    """
+    Process the callback_query. This method generates a new calendar if forward or
+    backward is pressed. This method should be called inside a CallbackQueryHandler.
+    """
+    query = update.callback_query
+    (purpose, action, year, month, day) = separate_callback_data(query.data)
+    curr = date(int(year), int(month), 1)
+
+    dates_highlight = None
+    if purpose == CLNDR_ADMIN_VIEW_SCHEDULE:
+        dates_highlight = list(GroupTrainingDay.objects.filter(is_available=True).values_list('date', flat=True))
+
+    if action == CLNDR_IGNORE:
+        bot.answer_callback_query(callback_query_id=query.id)
+    elif action == CLNDR_DAY:
+        bot.edit_message_text(text=query.message.text,
+                              chat_id=query.message.chat_id,
+                              message_id=query.message.message_id
+                              )
+        return True, purpose, date(int(year), int(month), int(day))
+    elif action == CLNDR_PREV_MONTH:
+        pre = curr - timedelta(days=1)
+        bot.edit_message_text(text=query.message.text,
+                              chat_id=query.message.chat_id,
+                              message_id=query.message.message_id,
+                              reply_markup=create_calendar(purpose, int(pre.year), int(pre.month), dates_highlight))
+    elif action == CLNDR_NEXT_MONTH:
+        ne = curr + timedelta(days=31)
+        bot.edit_message_text(text=query.message.text,
+                              chat_id=query.message.chat_id,
+                              message_id=query.message.message_id,
+                              reply_markup=create_calendar(purpose, int(ne.year), int(ne.month), dates_highlight))
+    elif action == CLNDR_ACTION_BACK:
+        if purpose == CLNDR_ADMIN_VIEW_SCHEDULE:
+            text = 'Тренировочные дни'
+        else:
+            text = 'Тренировочные дни'
+
+        bot.edit_message_text(text=text,
+                              chat_id=query.message.chat_id,
+                              message_id=query.message.message_id,
+                              reply_markup=create_calendar(purpose, int(year), int(month), dates_highlight))
+    else:
+        bot.answer_callback_query(callback_query_id=query.id, text="Something went wrong!")
+    return False, purpose, []
+
+
+@admin_handler_decor()
+def inline_calendar_handler(bot, update, user):
+    selected, purpose, date_my = admin_calendar_selection(bot, update)
+    if selected:
+        if purpose == CLNDR_ADMIN_VIEW_SCHEDULE:
+            tr_days = GroupTrainingDay.objects.filter(date=date_my).select_related('group').order_by('start_time')
+            if tr_days.count():
+                markup = day_buttons_coach_info(tr_days, SHOW_GROUPDAY_INFO)
+
+                day_of_week = from_eng_to_rus_day_week[calendar.day_name[date_my.weekday()]]
+                text = '📅{} ({})'.format(date_my, day_of_week)
+            else:
+                tr_days = list(GroupTrainingDay.objects.filter(is_available=True).values_list('date', flat=True))
+                text = 'Нет тренировок в этот день'
+                markup = create_calendar(purpose, date_my.year, date_my.month, tr_days)
+        bot.edit_message_text(text,
+                              chat_id=update.callback_query.message.chat_id,
+                              message_id=update.callback_query.message.message_id,
+                              reply_markup=markup,
+                              parse_mode='HTML')
+
+
 @admin_handler_decor()
 def show_coach_schedule(bot, update, user):
-    tr_days = [x['date'] for x in GroupTrainingDay.objects.all().distinct('date').values('date')]
-    buttons = construct_dt_menu(SELECT_DAY_TO_SHOW_COACH_SCHEDULE + '*' + str(date.today().month), tr_days)
+    tr_days = list(GroupTrainingDay.objects.filter(is_available=True).values_list('date', flat=True))
     bot.send_message(user.id,
                      'Тренировочные дни',
-                     reply_markup=buttons)
-
-
-@admin_handler_decor()
-def choose_dt_for_coach_time_schedule(bot, update, user):
-    date_btn, date_type = update.callback_query.data[len(SELECT_DAY_TO_SHOW_COACH_SCHEDULE):].split('|')
-    date_dt = datetime.datetime.strptime(date_btn, DT_BOT_FORMAT)
-    if date_type == 'day':
-        tr_days = GroupTrainingDay.objects.filter(date=date_dt).select_related('group').order_by('start_time')
-        buttons = day_buttons_coach_info(tr_days, SHOW_GROUPDAY_INFO)
-
-        day_of_week = from_eng_to_rus_day_week[calendar.day_name[date_dt.date().weekday()]]
-        bot.edit_message_text('📅{} ({})'.format(date_btn, day_of_week),
-                              chat_id=update.callback_query.message.chat_id,
-                              message_id=update.callback_query.message.message_id,
-                              reply_markup=buttons)
-
-    else:
-        all_tr_days = [x['date'] for x in GroupTrainingDay.objects.all().distinct('date').values('date')]
-        buttons = construct_dt_menu(SELECT_DAY_TO_SHOW_COACH_SCHEDULE + '*' + str(date_dt.month),
-                                    all_tr_days, date=date_dt)
-        bot.edit_message_text(text='Тренировочные дни',
-                              chat_id=update.callback_query.message.chat_id,
-                              message_id=update.callback_query.message.message_id,
-                              reply_markup=buttons)
+                     reply_markup=create_calendar(CLNDR_ADMIN_VIEW_SCHEDULE, dates_to_highlight=tr_days))
 
 
 def info_about_users(users, for_admin=False):
@@ -148,7 +195,7 @@ def show_traingroupday_info(bot, update, user):
 
     buttons = [[
         inlinebutt('⬅️ назад',
-                   callback_data=f"{SELECT_DAY_TO_SHOW_COACH_SCHEDULE}{tr_day.date.strftime(DT_BOT_FORMAT)}|day"),
+                   callback_data=create_callback_data(CLNDR_ADMIN_VIEW_SCHEDULE, CLNDR_DAY, tr_day.date.year, tr_day.date.month, tr_day.date.day)),
     ]]
 
     bot.edit_message_text(text,

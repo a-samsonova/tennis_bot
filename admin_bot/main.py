@@ -15,13 +15,12 @@ from admin_bot.handlers import (
     start,
     permission_for_ind_train,
     show_coach_schedule,
-    choose_dt_for_coach_time_schedule,
-    show_traingroupday_info
+    show_traingroupday_info,
+    inline_calendar_handler
 )
 from tele_interface.manage_data import (
     PERMISSION_FOR_IND_TRAIN,
     ADMIN_TIME_SCHEDULE_BUTTON,
-    SELECT_DAY_TO_SHOW_COACH_SCHEDULE,
     SHOW_GROUPDAY_INFO
 )
 
@@ -33,8 +32,8 @@ def add_handlers(updater):
 
     dp.add_handler(CallbackQueryHandler(permission_for_ind_train, pattern='^{}'.format(PERMISSION_FOR_IND_TRAIN)))
     dp.add_handler(RegexHandler(fr'^{ADMIN_TIME_SCHEDULE_BUTTON}$', show_coach_schedule))
-    dp.add_handler(CallbackQueryHandler(choose_dt_for_coach_time_schedule, pattern='^{}'.format(SELECT_DAY_TO_SHOW_COACH_SCHEDULE)))
     dp.add_handler(CallbackQueryHandler(show_traingroupday_info, pattern='^{}'.format(SHOW_GROUPDAY_INFO)))
+    dp.add_handler(CallbackQueryHandler(inline_calendar_handler))
 
 
 def main():

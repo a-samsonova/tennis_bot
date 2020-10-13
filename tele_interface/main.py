@@ -16,24 +16,19 @@ from tele_interface.handlers import (
     skip_lesson_main_menu_button,
     take_lesson,
     user_main_info,
-    choose_dt_for_cancel,
-    choose_dt_for_group_lesson,
     select_precise_group_lesson_time,
     choose_type_of_training,
     select_dt_for_ind_lesson,
-    choose_dt_time_for_ind_train,
     select_precise_ind_lesson_time,
     confirm_group_lesson,
     skip_lesson,
-    get_help
+    get_help,
+    inline_calendar_handler,
 )
 from tele_interface.manage_data import (
-    SELECT_SKIP_TIME_BUTTON,
-    SELECT_GROUP_LESSON_TIME,
     SELECT_PRECISE_GROUP_TIME,
     SELECT_TRAINING_TYPE,
     SELECT_DURATION_FOR_IND_TRAIN,
-    SELECT_IND_LESSON_TIME,
     SELECT_PRECISE_IND_TIME,
     CONFIRM_GROUP_LESSON,
     SHOW_INFO_ABOUT_SKIPPING_DAY,
@@ -57,16 +52,14 @@ def add_handlers(updater):
     dp.add_handler(RegexHandler(r'^\w+\s\w+$', get_personal_data))
     dp.add_handler(RegexHandler(r'^\d+$', get_personal_data))
 
-    dp.add_handler(CallbackQueryHandler(choose_dt_for_cancel, pattern='^{}'.format(SELECT_SKIP_TIME_BUTTON)))
-    dp.add_handler(CallbackQueryHandler(choose_dt_for_group_lesson, pattern='^{}'.format(SELECT_GROUP_LESSON_TIME)))
     dp.add_handler(CallbackQueryHandler(select_precise_group_lesson_time, pattern='^{}'.format(SELECT_PRECISE_GROUP_TIME)))
     dp.add_handler(CallbackQueryHandler(take_lesson, pattern='^{}'.format(SELECT_TRAINING_TYPE)))
     dp.add_handler(CallbackQueryHandler(select_dt_for_ind_lesson, pattern='^{}'.format(SELECT_DURATION_FOR_IND_TRAIN)))
-    dp.add_handler(CallbackQueryHandler(choose_dt_time_for_ind_train, pattern='^{}'.format(SELECT_IND_LESSON_TIME)))
     dp.add_handler(CallbackQueryHandler(select_precise_ind_lesson_time, pattern='^{}'.format(SELECT_PRECISE_IND_TIME)))
     dp.add_handler(CallbackQueryHandler(choose_type_of_training, pattern='^{}'.format(TAKE_LESSON_BUTTON)))
     dp.add_handler(CallbackQueryHandler(confirm_group_lesson, pattern='^{}'.format(CONFIRM_GROUP_LESSON)))
     dp.add_handler(CallbackQueryHandler(skip_lesson, pattern='^{}'.format(SHOW_INFO_ABOUT_SKIPPING_DAY)))
+    dp.add_handler(CallbackQueryHandler(inline_calendar_handler))
 
 
 def main():

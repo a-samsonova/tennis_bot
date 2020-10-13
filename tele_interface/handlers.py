@@ -1,33 +1,29 @@
 from admin_bot.handlers import info_about_users
 from .utils import (handler_decor,
                     get_available_dt_time4ind_train, select_tr_days_for_skipping,
-                    get_potential_days_for_group_training,)
+                    get_potential_days_for_group_training, separate_callback_data, create_callback_data,
+                    create_calendar, construct_time_menu_for_group_lesson, construct_detail_menu_for_skipping,
+                    construct_time_menu_4ind_lesson, )
 from base.utils import (construct_main_menu,
-                        construct_dt_menu,
-                        construct_time_menu_for_group_lesson,
-                        construct_time_menu_4ind_lesson,
-                        from_digit_to_month, send_message, )
+                        from_digit_to_month, send_message, DT_BOT_FORMAT, TM_TIME_SCHEDULE_FORMAT, )
 from base.models import (User,
                          GroupTrainingDay,
                          TrainingGroup,)
 from .manage_data import (
-    SELECT_SKIP_TIME_BUTTON,
-    SELECT_GROUP_LESSON_TIME,
     SELECT_PRECISE_GROUP_TIME,
     from_eng_to_rus_day_week,
     SELECT_TRAINING_TYPE,
     SELECT_DURATION_FOR_IND_TRAIN,
-    SELECT_IND_LESSON_TIME,
     SELECT_PRECISE_IND_TIME,
     PERMISSION_FOR_IND_TRAIN,
     CONFIRM_GROUP_LESSON,
-    SHOW_INFO_ABOUT_SKIPPING_DAY,
+    SHOW_INFO_ABOUT_SKIPPING_DAY, TAKE_LESSON_BUTTON, CLNDR_IGNORE, CLNDR_DAY, CLNDR_PREV_MONTH, CLNDR_NEXT_MONTH,
+    CLNDR_ACTION_BACK, CLNDR_ACTION_SKIP, CLNDR_ACTION_TAKE_GROUP, CLNDR_ACTION_TAKE_IND,
 )
 from calendar import monthrange
 from tennis_bot.config import ADMIN_TELEGRAM_TOKEN
 from datetime import date, datetime, timedelta
 from django.db.models import Q
-from base.utils import DT_BOT_FORMAT, TM_TIME_SCHEDULE_FORMAT
 
 from telegram import (
     InlineKeyboardButton as inline_button,
@@ -161,61 +157,160 @@ def user_main_info(bot, update, user):
                      reply_markup=construct_main_menu())
 
 
+def process_calendar_selection(bot, update, user):
+    """
+    Process the callback_query. This method generates a new calendar if forward or
+    backward is pressed. This method should be called inside a CallbackQueryHandler.
+    """
+    query = update.callback_query
+    (purpose, action, year, month, day) = separate_callback_data(query.data)
+    curr = datetime(int(year), int(month), 1)
+
+    if purpose == CLNDR_ACTION_SKIP:
+        highlight_dates = select_tr_days_for_skipping(user)
+    elif purpose == CLNDR_ACTION_TAKE_GROUP:
+        training_days = get_potential_days_for_group_training(user)
+        highlight_dates = list(training_days.values_list('date', flat=True))
+    elif re.findall(rf'({CLNDR_ACTION_TAKE_IND})(\d.\d)', purpose):
+        duration = re.findall(rf'({CLNDR_ACTION_TAKE_IND})(\d.\d)', purpose)[0][1]
+        highlight_dates, _ = get_available_dt_time4ind_train(float(duration))
+
+    if action == CLNDR_IGNORE:
+        bot.answer_callback_query(callback_query_id=query.id)
+    elif action == CLNDR_DAY:
+        bot.edit_message_text(text=query.message.text,
+                              chat_id=query.message.chat_id,
+                              message_id=query.message.message_id
+                              )
+        return True, purpose, datetime(int(year), int(month), int(day))
+    elif action == CLNDR_PREV_MONTH:
+        pre = curr - timedelta(days=1)
+        bot.edit_message_text(text=query.message.text,
+                              chat_id=query.message.chat_id,
+                              message_id=query.message.message_id,
+                              reply_markup=create_calendar(purpose, int(pre.year), int(pre.month), highlight_dates))
+    elif action == CLNDR_NEXT_MONTH:
+        ne = curr + timedelta(days=31)
+        bot.edit_message_text(text=query.message.text,
+                              chat_id=query.message.chat_id,
+                              message_id=query.message.message_id,
+                              reply_markup=create_calendar(purpose, int(ne.year), int(ne.month), highlight_dates))
+    elif action == CLNDR_ACTION_BACK:
+        if purpose == CLNDR_ACTION_SKIP:
+            text = 'Выбери дату тренировки для отмены.\n' \
+                   '✅ -- дни, доступные для отмены.'
+        elif purpose == CLNDR_ACTION_TAKE_GROUP:
+            text = 'Выбери дату тренировки\n' \
+                   '✅ -- дни, доступные для групповых тренировок'
+        elif re.findall(rf'({CLNDR_ACTION_TAKE_IND})(\d.\d)', purpose):
+            text = 'Выбери дату индивидуальной тренировки\n' \
+                   '✅ -- дни, доступные для индивидуальных тренировок'
+        bot.edit_message_text(text=text,
+                              chat_id=query.message.chat_id,
+                              message_id=query.message.message_id,
+                              reply_markup=create_calendar(purpose, int(year), int(month), highlight_dates))
+    else:
+        bot.answer_callback_query(callback_query_id=query.id, text="Something went wrong!")
+    return False, purpose, []
+
+
+@handler_decor(check_status=True)
+def inline_calendar_handler(bot, update, user):
+    selected, purpose, date_my = process_calendar_selection(bot, update, user)
+    if selected:
+        date_comparison = date(date_my.year, date_my.month, date_my.day)
+        if purpose == CLNDR_ACTION_SKIP:
+            if date_comparison < date.today():
+                text = 'Тренировка уже прошла, ее нельзя отменить.\n' \
+                       '✅ -- дни, доступные для отмены.'
+                markup = create_calendar(CLNDR_ACTION_SKIP, date_my.year, date_my.month, select_tr_days_for_skipping(user))
+            else:
+                training_day = GroupTrainingDay.objects.filter(Q(group__users__in=[user]) | Q(visitors__in=[user]),
+                                                               date=date_my).select_related('group').order_by(
+                    'id').distinct('id').first()
+                if training_day:
+                    if not training_day.is_individual:
+                        group_name = f"{training_day.group.name}\n"
+                        group_players = f'Игроки группы:\n{info_about_users(training_day.group.users)}\n'
+                    else:
+                        group_name = "🧞‍♂индивидуальная тренировка🧞‍♂️\n"
+                        group_players = ''
+
+                    markup, text = construct_detail_menu_for_skipping(training_day, purpose, group_name, group_players)
+
+                else:
+                    text = 'Нет тренировки в этот день, выбери другой.\n' \
+                           '✅ -- дни, доступные для отмены.'
+                    markup = create_calendar(purpose, date_my.year, date_my.month, select_tr_days_for_skipping(user))
+
+        elif purpose == CLNDR_ACTION_TAKE_GROUP:
+            training_days = get_potential_days_for_group_training(user)
+            print(training_days)
+            highlight_dates = list(training_days.values_list('date', flat=True))
+            if date_comparison < date.today():
+                text = 'Тренировка уже прошла, на нее нельзя записаться.\n' \
+                       '✅ -- дни, доступные для групповых тренировок'
+                markup = create_calendar(purpose, date_my.year, date_my.month, highlight_dates)
+            else:
+                training_days = training_days.filter(date=date_comparison)
+                if training_days.count():
+                    buttons = construct_time_menu_for_group_lesson(SELECT_PRECISE_GROUP_TIME, training_days, date_my, purpose)
+
+                    day_of_week = calendar.day_name[date_my.weekday()]
+                    text = f'Выбери время занятия на {date_my.strftime(DT_BOT_FORMAT)} ({from_eng_to_rus_day_week[day_of_week]}).'
+                    markup = buttons
+
+                else:
+                    text = 'Нет доступных тренировок в этот день, выбери другой.\n' \
+                           '✅ -- дни, доступные для групповых тренировок'
+                    markup = create_calendar(purpose, date_my.year, date_my.month, highlight_dates)
+
+        elif re.findall(rf'({CLNDR_ACTION_TAKE_IND})(\d.\d)', purpose):
+            duration = re.findall(rf'({CLNDR_ACTION_TAKE_IND})(\d.\d)', purpose)[0][1]
+            available_days, date_time_dict = get_available_dt_time4ind_train(float(duration))
+            if date_comparison < date.today():
+                text = 'Это уже в прошлом, давай не будем об этом.\n' \
+                       '✅ -- дни, доступные для индивидуальных тренировок'
+                markup = create_calendar(CLNDR_ACTION_SKIP, date_my.year, date_my.month, available_days)
+            else:
+                date_my = date(date_my.year, date_my.month, date_my.day)
+
+                poss_time_for_train = []
+                if date_time_dict.get(date_my):
+                    for i in range(len(date_time_dict[date_my]) - int(float(duration) * 2)):
+                        if datetime.combine(date_my,
+                                            date_time_dict[date_my][i + int(float(duration) * 2)]) - datetime.combine(
+                                date_my, date_time_dict[date_my][i]) == timedelta(hours=float(duration)):
+                            poss_time_for_train.append(date_time_dict[date_my][i])
+
+                    markup = construct_time_menu_4ind_lesson(SELECT_PRECISE_IND_TIME, poss_time_for_train, date_my,
+                                                              float(duration), user)
+                    text = 'Выбери время'
+                else:
+                    text = 'Нельзя записаться на этот день, выбери другой.\n' \
+                           '✅ -- дни, доступные для индивидуальных тренировок.'
+                    markup = create_calendar(purpose, date_my.year, date_my.month, available_days)
+
+        bot.edit_message_text(text,
+                              chat_id=update.callback_query.message.chat_id,
+                              message_id=update.callback_query.message.message_id,
+                              reply_markup=markup,
+                              parse_mode='HTML')
+
+
 @handler_decor(check_status=True)
 def skip_lesson_main_menu_button(bot, update, user):
     available_grouptraining_dates = select_tr_days_for_skipping(user)
     if available_grouptraining_dates:
-        buttons = construct_dt_menu(SELECT_SKIP_TIME_BUTTON + '*' + str(date.today().month),
-                                    available_grouptraining_dates)
+        print(available_grouptraining_dates)
         bot.send_message(user.id,
-                         'Выбери дату тренировки для отмены.',
-                         reply_markup=buttons)
+                         'Выбери дату тренировки для отмены.\n'
+                         '✅ -- дни, доступные для отмены.',
+                         reply_markup=create_calendar(CLNDR_ACTION_SKIP, dates_to_highlight=available_grouptraining_dates))
     else:
         bot.send_message(user.id,
                          'Пока что нечего пропускать.',
                          reply_markup=construct_main_menu())
-
-
-@handler_decor()
-def choose_dt_for_cancel(bot, update, user):
-    date_btn, date_type = update.callback_query.data[len(SELECT_SKIP_TIME_BUTTON):].split('|')
-    date_dt = datetime.strptime(date_btn, DT_BOT_FORMAT)
-    if date_type == 'day':
-        training_day = GroupTrainingDay.objects.filter(Q(group__users__in=[user]) | Q(visitors__in=[user]),
-                                                       date=date_dt).select_related('group').order_by('id').distinct('id').first()
-
-        if not training_day.is_individual:
-            group_name = f"{training_day.group.name}\n"
-            group_players = f'Игроки группы:\n{info_about_users(training_day.group.users)}\n'
-        else:
-            group_name = "🧞‍♂индивидуальная тренировка🧞‍♂️\n"
-            group_players = ''
-
-        end_time = datetime.combine(training_day.date, training_day.start_time) + training_day.duration
-        time = f'{training_day.start_time.strftime(TM_TIME_SCHEDULE_FORMAT)} — {end_time.strftime(TM_TIME_SCHEDULE_FORMAT)}'
-        day_of_week = from_eng_to_rus_day_week[calendar.day_name[training_day.date.weekday()]]
-
-        general_info = f'<b>{training_day.date.strftime(DT_BOT_FORMAT)} ({day_of_week})\n{time}\n</b>' + group_name + group_players
-
-        buttons = [[
-            inline_button('Пропустить', callback_data=SHOW_INFO_ABOUT_SKIPPING_DAY + f'{training_day.id}')
-        ], [
-            inline_button('⬅️ назад', callback_data=SELECT_SKIP_TIME_BUTTON + date_btn + '|' + 'month')
-        ]]
-
-        bot.edit_message_text(general_info,
-                              chat_id=update.callback_query.message.chat_id,
-                              message_id=update.callback_query.message.message_id,
-                              reply_markup=inline_markup(buttons),
-                              parse_mode='HTML')
-    else:
-        available_grouptraining_dates = select_tr_days_for_skipping(user)
-        buttons = construct_dt_menu(SELECT_SKIP_TIME_BUTTON + '*' + str(date_dt.month),
-                                    available_grouptraining_dates, date=date_dt)
-        bot.edit_message_text('Выбери дату тренировки для отмены.',
-                              chat_id=update.callback_query.message.chat_id,
-                              message_id=update.callback_query.message.message_id,
-                              reply_markup=buttons)
 
 
 @handler_decor(check_status=True)
@@ -246,7 +341,8 @@ def skip_lesson(bot, update, user):
         send_message(admins, text, admin_bot)
 
     else:
-        if user in training_day.visitors.all():  # проверяем его ли эта группа или он удаляется из занятия другой группы
+        # проверяем его ли эта группа или он удаляется из занятия другой группы
+        if user in training_day.visitors.all():
             training_day.visitors.remove(user)
         else:
             training_day.absent.add(user)
@@ -281,25 +377,19 @@ def take_lesson(bot, update, user):
     """записаться на тренировку"""
     tr_type = update.callback_query.data[len(SELECT_TRAINING_TYPE):]
     if tr_type == 'group':
-        potential_free_places = get_potential_days_for_group_training(user).filter(
-            date__gte=datetime.now() + timedelta(hours=3))
-        days_with_free_places = list(set([x.date for x in potential_free_places]))
-        buttons = construct_dt_menu(SELECT_GROUP_LESSON_TIME + '*' + str(date.today().month),
-                                    days_with_free_places)
         if user.bonus_lesson > 0:
             text = 'Выбери тренировку для записи.\n' \
-                   '<b>Пожертвуешь одним отыгрышем.</b>'
+                   '<b>Пожертвуешь одним отыгрышем.</b>\n' \
+                   '✅ -- дни, доступные для групповых тренировок.'
         else:
             text = '⚠️ATTENTION⚠️\n' \
                    'В данный момент у тебя нет отыгрышей.\n' \
-                   '<b> Занятие будет стоить 600₽ </b>'
-        bot.edit_message_text(
-            text,
-            reply_markup=buttons,
-            chat_id=update.callback_query.message.chat_id,
-            message_id=update.callback_query.message.message_id,
-            parse_mode='HTML',
-        )
+                   '<b> Занятие будет стоить 600₽ </b>\n' \
+                   '✅ -- дни, доступные для групповых тренировок.'
+        training_days = get_potential_days_for_group_training(user).filter(date__gte=date.today())
+        highlight_dates = list(training_days.values_list('date', flat=True))
+        markup = create_calendar(CLNDR_ACTION_TAKE_GROUP, dates_to_highlight=highlight_dates)
+
     else:
         buttons = [[
             inline_button('1 час', callback_data=SELECT_DURATION_FOR_IND_TRAIN + '1.0')
@@ -309,64 +399,29 @@ def take_lesson(bot, update, user):
             inline_button('2 часа', callback_data=SELECT_DURATION_FOR_IND_TRAIN + '2.0')
         ], [
             inline_button('⬅️ назад',
-                          callback_data='Записаться на занятие'),
+                          callback_data=TAKE_LESSON_BUTTON),
         ]]
+        markup = inline_markup(buttons)
+        text = 'Выбери продолжительность занятия'
 
-        bot.edit_message_text(
-            'Выбери продолжительность занятия',
-            reply_markup=inline_markup(buttons),
-            chat_id=update.callback_query.message.chat_id,
-            message_id=update.callback_query.message.message_id,
-            parse_mode='HTML',
-        )
+    bot.edit_message_text(
+        text,
+        reply_markup=markup,
+        chat_id=update.callback_query.message.chat_id,
+        message_id=update.callback_query.message.message_id,
+        parse_mode='HTML',
+    )
 
 
 @handler_decor()
 def select_dt_for_ind_lesson(bot, update, user):
     duration = float(update.callback_query.data[len(SELECT_DURATION_FOR_IND_TRAIN):])
     available_days, _ = get_available_dt_time4ind_train(duration)
-
-    if available_days:
-        buttons = construct_dt_menu(SELECT_IND_LESSON_TIME + '|' + str(duration) + '*' + str(available_days[0].month),
-                                    available_days)
-
-        bot.edit_message_text('Выбери дату тренировки.',
-                              reply_markup=buttons,
-                              chat_id=update.callback_query.message.chat_id,
-                              message_id=update.callback_query.message.message_id,)
-    else:
-        bot.edit_message_text('В данный момент нет доступных дней для записи.',
-                              chat_id=update.callback_query.message.chat_id,
-                              message_id=update.callback_query.message.message_id,
-                              )
-
-
-@handler_decor()
-def choose_dt_time_for_ind_train(bot, update, user):
-    date_btn, date_type = update.callback_query.data[len(SELECT_IND_LESSON_TIME)+4:].split('|')
-    _, duration = update.callback_query.data[:len(SELECT_IND_LESSON_TIME)+4].split('|')
-    date_dt = datetime.strptime(date_btn, DT_BOT_FORMAT)
-    available_days, date_time_dict = get_available_dt_time4ind_train(float(duration))
-    poss_time_for_train = []
-
-    if date_type == 'day':
-        for i in range(len(date_time_dict[date_dt.date()]) - int(float(duration) * 2)):
-            if datetime.combine(date_dt.date(), date_time_dict[date_dt.date()][i + int(float(duration) * 2)]) - datetime.combine(
-                    date_dt.date(), date_time_dict[date_dt.date()][i]) == timedelta(hours=float(duration)):
-                poss_time_for_train.append(date_time_dict[date_dt.date()][i])
-        buttons = construct_time_menu_4ind_lesson(SELECT_PRECISE_IND_TIME, poss_time_for_train, date_btn,
-                                                  float(duration), user)
-
-        bot.edit_message_text('Выбери время',
-                              chat_id=update.callback_query.message.chat_id,
-                              message_id=update.callback_query.message.message_id,
-                              reply_markup=buttons)
-    else:
-        buttons = construct_dt_menu(SELECT_IND_LESSON_TIME + '|' + str(duration) + '*' + str(date_dt.month),
-                                    available_days, date=date_dt)
-        bot.edit_message_reply_markup(chat_id=update.callback_query.message.chat_id,
-                                      message_id=update.callback_query.message.message_id,
-                                      reply_markup=buttons)
+    buttons = create_calendar(f'{CLNDR_ACTION_TAKE_IND}{duration}', dates_to_highlight=available_days)
+    bot.edit_message_text('Выбери дату тренировки.',
+                          reply_markup=buttons,
+                          chat_id=update.callback_query.message.chat_id,
+                          message_id=update.callback_query.message.message_id,)
 
 
 @handler_decor()
@@ -408,36 +463,6 @@ def select_precise_ind_lesson_time(bot, update, user):
 
 
 @handler_decor()
-def choose_dt_for_group_lesson(bot, update, user):
-    date_btn, date_type = update.callback_query.data[len(SELECT_GROUP_LESSON_TIME):].split('|')
-    date_dt = datetime.strptime(date_btn, DT_BOT_FORMAT)
-
-    potential_free_places = get_potential_days_for_group_training(user)
-
-    if date_type == 'day':
-
-        training_days = potential_free_places.filter(date=date_dt)
-        buttons = construct_time_menu_for_group_lesson(SELECT_PRECISE_GROUP_TIME, training_days)
-
-        day_of_week = calendar.day_name[date_dt.weekday()]
-        bot.edit_message_text(f'Выбери время занятия на {date_btn} ({from_eng_to_rus_day_week[day_of_week]}).',
-                              chat_id=update.callback_query.message.chat_id,
-                              message_id=update.callback_query.message.message_id,
-                              reply_markup=buttons)
-    else:
-        potential_free_places = potential_free_places.filter(date__gte=datetime.now() + timedelta(hours=3))
-        days_with_free_places = list(set([x.date for x in potential_free_places]))
-
-        buttons = construct_dt_menu(SELECT_GROUP_LESSON_TIME + '*' + str(date_dt.month),
-                                    days_with_free_places, date=date_dt)
-
-        bot.edit_message_text('Выбери тренировку для записи.',
-                              chat_id=update.callback_query.message.chat_id,
-                              message_id=update.callback_query.message.message_id,
-                              reply_markup=buttons)
-
-
-@handler_decor()
 def select_precise_group_lesson_time(bot, update, user):
     """
     после того, как выбрал точное время для групповой тренировки,
@@ -474,7 +499,7 @@ def select_precise_group_lesson_time(bot, update, user):
         inline_button('Записаться', callback_data=f"{CONFIRM_GROUP_LESSON}{tr_day_id}")
     ], [
         inline_button('⬅️ назад',
-                      callback_data=SELECT_GROUP_LESSON_TIME + tr_day.date.strftime(DT_BOT_FORMAT) + '|month')
+                      callback_data=create_callback_data(CLNDR_ACTION_TAKE_GROUP, CLNDR_DAY, tr_day.date.year, tr_day.date.month, tr_day.date.day))
     ]]
 
     bot.edit_message_text(
@@ -524,7 +549,7 @@ def confirm_group_lesson(bot, update, user):
                 text = 'Упс, похоже уже не осталось свободных мест на это время, выбери другое.'
                 buttons = [[
                     inline_button('⬅️ назад',
-                                  callback_data=SELECT_GROUP_LESSON_TIME + tr_day.date.strftime(DT_BOT_FORMAT) + '|month')
+                                  callback_data=create_callback_data(CLNDR_ACTION_TAKE_GROUP, CLNDR_DAY, tr_day.date.year, tr_day.date.month, tr_day.date.day))
                 ]]
                 markup = inline_markup(buttons)
         else:#если пытается записаться в свою группу
