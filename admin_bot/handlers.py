@@ -82,10 +82,6 @@ def admin_calendar_selection(bot, update):
     (purpose, action, year, month, day) = separate_callback_data(query.data)
     curr = date(int(year), int(month), 1)
 
-    dates_highlight = None
-    if purpose == CLNDR_ADMIN_VIEW_SCHEDULE:
-        dates_highlight = list(GroupTrainingDay.objects.filter(is_available=True).values_list('date', flat=True))
-
     if action == CLNDR_IGNORE:
         bot.answer_callback_query(callback_query_id=query.id)
     elif action == CLNDR_DAY:
@@ -99,13 +95,13 @@ def admin_calendar_selection(bot, update):
         bot.edit_message_text(text=query.message.text,
                               chat_id=query.message.chat_id,
                               message_id=query.message.message_id,
-                              reply_markup=create_calendar(purpose, int(pre.year), int(pre.month), dates_highlight))
+                              reply_markup=create_calendar(purpose, int(pre.year), int(pre.month)))
     elif action == CLNDR_NEXT_MONTH:
         ne = curr + timedelta(days=31)
         bot.edit_message_text(text=query.message.text,
                               chat_id=query.message.chat_id,
                               message_id=query.message.message_id,
-                              reply_markup=create_calendar(purpose, int(ne.year), int(ne.month), dates_highlight))
+                              reply_markup=create_calendar(purpose, int(ne.year), int(ne.month)))
     elif action == CLNDR_ACTION_BACK:
         if purpose == CLNDR_ADMIN_VIEW_SCHEDULE:
             text = 'Тренировочные дни'
@@ -115,7 +111,7 @@ def admin_calendar_selection(bot, update):
         bot.edit_message_text(text=text,
                               chat_id=query.message.chat_id,
                               message_id=query.message.message_id,
-                              reply_markup=create_calendar(purpose, int(year), int(month), dates_highlight))
+                              reply_markup=create_calendar(purpose, int(year), int(month)))
     else:
         bot.answer_callback_query(callback_query_id=query.id, text="Something went wrong!")
     return False, purpose, []
@@ -133,9 +129,8 @@ def inline_calendar_handler(bot, update, user):
                 day_of_week = from_eng_to_rus_day_week[calendar.day_name[date_my.weekday()]]
                 text = '📅{} ({})'.format(date_my, day_of_week)
             else:
-                tr_days = list(GroupTrainingDay.objects.filter(is_available=True).values_list('date', flat=True))
                 text = 'Нет тренировок в этот день'
-                markup = create_calendar(purpose, date_my.year, date_my.month, tr_days)
+                markup = create_calendar(purpose, date_my.year, date_my.month)
         bot.edit_message_text(text,
                               chat_id=update.callback_query.message.chat_id,
                               message_id=update.callback_query.message.message_id,
@@ -145,10 +140,9 @@ def inline_calendar_handler(bot, update, user):
 
 @admin_handler_decor()
 def show_coach_schedule(bot, update, user):
-    tr_days = list(GroupTrainingDay.objects.filter(is_available=True).values_list('date', flat=True))
     bot.send_message(user.id,
                      'Тренировочные дни',
-                     reply_markup=create_calendar(CLNDR_ADMIN_VIEW_SCHEDULE, dates_to_highlight=tr_days))
+                     reply_markup=create_calendar(CLNDR_ADMIN_VIEW_SCHEDULE))
 
 
 @admin_handler_decor()
