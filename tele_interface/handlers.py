@@ -245,7 +245,6 @@ def inline_calendar_handler(bot, update, user):
 
         elif purpose == CLNDR_ACTION_TAKE_GROUP:
             training_days = get_potential_days_for_group_training(user)
-            print(training_days)
             highlight_dates = list(training_days.values_list('date', flat=True))
             if date_comparison < date.today():
                 text = 'Тренировка уже прошла, на нее нельзя записаться.\n' \
