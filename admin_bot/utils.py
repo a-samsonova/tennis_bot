@@ -1,8 +1,9 @@
 from base.models import User
 from functools import wraps
 
-from base.utils import DT_BOT_FORMAT, TM_TIME_SCHEDULE_FORMAT
-from tele_interface.manage_data import SELECT_DAY_TO_SHOW_COACH_SCHEDULE
+from base.utils import  TM_TIME_SCHEDULE_FORMAT
+from tele_interface.manage_data import  CLNDR_ADMIN_VIEW_SCHEDULE, CLNDR_ACTION_BACK
+from tele_interface.utils import create_callback_data
 from tennis_bot.settings import DEBUG
 from telegram import (InlineKeyboardButton as inlinebutt,
                       InlineKeyboardMarkup as inlinemark,)
@@ -88,7 +89,7 @@ def day_buttons_coach_info(tr_days, button_text):
 
     buttons.append([
         inlinebutt('⬅️ назад',
-                   callback_data=f"{SELECT_DAY_TO_SHOW_COACH_SCHEDULE}{tr_days.first().date.strftime(DT_BOT_FORMAT)}|month"),
+                   callback_data=create_callback_data(CLNDR_ADMIN_VIEW_SCHEDULE, CLNDR_ACTION_BACK, tr_days.first().date.year, tr_days.first().date.month, 0)),
     ])
 
     return inlinemark(buttons)
