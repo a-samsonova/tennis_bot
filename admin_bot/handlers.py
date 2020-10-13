@@ -4,13 +4,13 @@ from base.models import User, GroupTrainingDay
 from base.utils import construct_admin_main_menu, DT_BOT_FORMAT, TM_TIME_SCHEDULE_FORMAT
 from tele_interface.manage_data import PERMISSION_FOR_IND_TRAIN, SHOW_GROUPDAY_INFO, \
     from_eng_to_rus_day_week, CLNDR_ADMIN_VIEW_SCHEDULE, CLNDR_ACTION_BACK, CLNDR_NEXT_MONTH, CLNDR_DAY, CLNDR_IGNORE, \
-    CLNDR_PREV_MONTH
+    CLNDR_PREV_MONTH, ADMIN_SITE
 from tele_interface.utils import create_calendar, separate_callback_data, create_callback_data
 from .utils import admin_handler_decor, day_buttons_coach_info
 from tennis_bot.config import TELEGRAM_TOKEN
 from datetime import date, datetime, timedelta
 from telegram import (InlineKeyboardButton as inlinebutt,
-                      InlineKeyboardMarkup as inlinemark,)
+                      InlineKeyboardMarkup as inlinemark, InlineKeyboardButton, )
 
 import datetime
 import telegram
@@ -149,6 +149,17 @@ def show_coach_schedule(bot, update, user):
     bot.send_message(user.id,
                      'Тренировочные дни',
                      reply_markup=create_calendar(CLNDR_ADMIN_VIEW_SCHEDULE, dates_to_highlight=tr_days))
+
+
+@admin_handler_decor()
+def redirect_to_site(bot, update, user):
+    buttons = []
+    buttons.append([
+        InlineKeyboardButton('Сайт', url='http://vladlen82.fvds.ru/admin/base/'),
+    ])
+    bot.send_message(user.id,
+                     ADMIN_SITE,
+                     reply_markup=inlinemark(buttons))
 
 
 def info_about_users(users, for_admin=False):

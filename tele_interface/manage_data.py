@@ -3,6 +3,8 @@ from_eng_to_rus_day_week = {
     'Thursday': 'четверг', 'Friday': 'пятница', 'Saturday': 'суббота'
 }
 ADMIN_TIME_SCHEDULE_BUTTON = 'Расписание'
+ADMIN_SITE = 'Перейти на сайт'
+
 TAKE_LESSON_BUTTON = 'Записаться на занятие'
 MY_DATA_BUTTON = 'Мои данные'
 SKIP_LESSON_BUTTON = 'Пропустить занятие'

@@ -3,7 +3,7 @@ from tele_interface.manage_data import (
     ADMIN_TIME_SCHEDULE_BUTTON,
     MY_DATA_BUTTON,
     SKIP_LESSON_BUTTON,
-    TAKE_LESSON_BUTTON, HELP_BUTTON, )
+    TAKE_LESSON_BUTTON, HELP_BUTTON, ADMIN_SITE, )
 
 import telegram
 
@@ -49,7 +49,8 @@ def construct_main_menu():
 
 def construct_admin_main_menu():
     return ReplyKeyboardMarkup([
-        [ADMIN_TIME_SCHEDULE_BUTTON]],
+        [ADMIN_TIME_SCHEDULE_BUTTON],
+        [ADMIN_SITE]],
         resize_keyboard=True)
 
 
